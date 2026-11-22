@@ -17,9 +17,15 @@ function node(tag, text, className) {
 
 const orders = snapshot.recommendations;
 const picker = element('item');
-const audit = snapshot.audit;
 const forecastPeak = Math.max(...orders.flatMap(order => order.forecast.map(([, , , high]) => high)));
 const forecastCeiling = Math.max(10, Math.ceil(forecastPeak / 10) * 10);
+const eventLabels = {
+  recommendation_created: 'Order recommended',
+  approved: 'Independent approval',
+  execution_requested: 'Order requested',
+  executed: 'Order recorded',
+  outcome_observed: 'Outcome recorded',
+};
 
 function renderForecast(forecast) {
   const chart = element('chart');
@@ -57,11 +63,25 @@ function renderRecommendation() {
   const leadTimeUnit = order.lead_time_days === 1 ? 'day' : 'days';
   show('supplier', `${order.supplier_id} · ${order.lead_time_days} ${leadTimeUnit}`);
   renderForecast(order.forecast);
+  renderOrderHistory(order);
+}
 
-  const hasHistory = order.sku_id === audit.sku && order.location_id === audit.location;
+function renderOrderHistory(order) {
+  const history = order.history;
   show('audit-order', `${order.sku_id} at ${order.location_id}`);
-  element('audit-record').hidden = !hasHistory;
-  element('history-empty').hidden = hasHistory;
+  element('audit-record').hidden = !history;
+  element('history-empty').hidden = Boolean(history);
+  if (!history) return;
+
+  const events = history.events.map(event => {
+    const item = node('li');
+    item.append(node('strong', eventLabels[event.event_type]), node('span', event.actor_role));
+    return item;
+  });
+  element('audit-events').replaceChildren(...events);
+  show('execution', history.execution_ref);
+  show('received', `${number.format(history.received)} units`);
+  show('observed', `${number.format(history.demand)} units`);
 }
 
 function renderScenarios() {
@@ -111,22 +131,6 @@ for (const [index, order] of orders.entries()) {
 }
 element('chart-axis').append(...[forecastCeiling, forecastCeiling / 2, 0].map(value => node('span', String(value))));
 picker.addEventListener('change', renderRecommendation);
-
-const eventLabels = {
-  recommendation_created: 'Order recommended',
-  approved: 'Independent approval',
-  execution_requested: 'Order requested',
-  executed: 'Order recorded',
-  outcome_observed: 'Outcome recorded',
-};
-for (const event of audit.events) {
-  const item = node('li');
-  item.append(node('strong', eventLabels[event.event_type]), node('span', event.actor_role));
-  element('audit-events').append(item);
-}
-show('execution', audit.execution_ref);
-show('received', `${number.format(audit.received)} units`);
-show('observed', `${number.format(audit.demand)} units`);
 
 renderRecommendation();
 renderScenarios();

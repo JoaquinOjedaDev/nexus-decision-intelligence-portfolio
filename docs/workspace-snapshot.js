@@ -108,7 +108,34 @@ const snapshot = {
           0.0,
           1.0
         ]
-      ]
+      ],
+      "history": {
+        "execution_ref": "MOCK-PO-63885F47E51C0F2C",
+        "received": 30,
+        "demand": 117,
+        "events": [
+          {
+            "event_type": "recommendation_created",
+            "actor_role": "planner"
+          },
+          {
+            "event_type": "approved",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "execution_requested",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "executed",
+            "actor_role": "system"
+          },
+          {
+            "event_type": "outcome_observed",
+            "actor_role": "planner"
+          }
+        ]
+      }
     },
     {
       "sku_id": "SKU-001",
@@ -203,7 +230,34 @@ const snapshot = {
           0.0,
           1.0
         ]
-      ]
+      ],
+      "history": {
+        "execution_ref": "MOCK-PO-89B8B3E7C80083BF",
+        "received": 50,
+        "demand": 101,
+        "events": [
+          {
+            "event_type": "recommendation_created",
+            "actor_role": "planner"
+          },
+          {
+            "event_type": "approved",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "execution_requested",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "executed",
+            "actor_role": "system"
+          },
+          {
+            "event_type": "outcome_observed",
+            "actor_role": "planner"
+          }
+        ]
+      }
     },
     {
       "sku_id": "SKU-002",
@@ -298,7 +352,34 @@ const snapshot = {
           0.0,
           1.0
         ]
-      ]
+      ],
+      "history": {
+        "execution_ref": "MOCK-PO-06AB329B48597B80",
+        "received": 100,
+        "demand": 124,
+        "events": [
+          {
+            "event_type": "recommendation_created",
+            "actor_role": "planner"
+          },
+          {
+            "event_type": "approved",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "execution_requested",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "executed",
+            "actor_role": "system"
+          },
+          {
+            "event_type": "outcome_observed",
+            "actor_role": "planner"
+          }
+        ]
+      }
     },
     {
       "sku_id": "SKU-002",
@@ -393,7 +474,34 @@ const snapshot = {
           0.0,
           2.0
         ]
-      ]
+      ],
+      "history": {
+        "execution_ref": "MOCK-PO-4169DEADEBE33F29",
+        "received": 80,
+        "demand": 142,
+        "events": [
+          {
+            "event_type": "recommendation_created",
+            "actor_role": "planner"
+          },
+          {
+            "event_type": "approved",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "execution_requested",
+            "actor_role": "approver"
+          },
+          {
+            "event_type": "executed",
+            "actor_role": "system"
+          },
+          {
+            "event_type": "outcome_observed",
+            "actor_role": "planner"
+          }
+        ]
+      }
     }
   ],
   "scenarios": [
@@ -418,35 +526,5 @@ const snapshot = {
       "expedite_units": 66.33333333333333,
       "evaluation_paths": 6
     }
-  ],
-  "audit": {
-    "sku": "SKU-001",
-    "location": "DC-ARG-01",
-    "execution_ref": "MOCK-PO-AA45BD69F5B418E9",
-    "effects": 1,
-    "received": 30,
-    "demand": 117,
-    "events": [
-      {
-        "event_type": "recommendation_created",
-        "actor_role": "system"
-      },
-      {
-        "event_type": "approved",
-        "actor_role": "approver"
-      },
-      {
-        "event_type": "execution_requested",
-        "actor_role": "approver"
-      },
-      {
-        "event_type": "executed",
-        "actor_role": "system"
-      },
-      {
-        "event_type": "outcome_observed",
-        "actor_role": "planner"
-      }
-    ]
-  }
+  ]
 };
