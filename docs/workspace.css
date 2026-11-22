@@ -141,6 +141,7 @@ th, td { text-align: start; font-variant-numeric: tabular-nums; padding: .3rem .
   background: #edf5ef;
 }
 .workflow .section-note { margin-top: .45rem; max-width: 32ch; }
+.history-empty { align-self: center; color: var(--muted); font-size: .9rem; }
 .events { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: .35rem 0 0; font-size: .85rem; }
 .events li { margin-inline-start: 1.15rem; }
 .events li::marker { color: var(--teal); font-weight: 700; }

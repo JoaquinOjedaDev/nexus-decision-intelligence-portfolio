@@ -9,7 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./workspace.css">
   <script src="./workspace-snapshot.js" defer></script>
-  <script src="./workspace.js" defer></script>
+  <script src="./workspace.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to plan</a>
@@ -89,10 +89,10 @@
 
     <section id="workflow" class="panel workflow" aria-labelledby="workflow-title" tabindex="-1">
       <div>
-        <h2 id="workflow-title">Recorded order history</h2>
+        <h2 id="workflow-title">Order history</h2>
         <p class="section-note" id="audit-order"></p>
       </div>
-      <div>
+      <div id="audit-record" hidden>
         <ol class="events" id="audit-events"></ol>
         <dl class="audit-facts">
           <div><dt>Order reference</dt><dd id="execution">…</dd></div>
@@ -100,6 +100,7 @@
           <div><dt>Demand observed</dt><dd id="observed">…</dd></div>
         </dl>
       </div>
+      <p class="history-empty" id="history-empty" hidden>No order recorded for this selection.</p>
     </section>
   </main>
 </body>
