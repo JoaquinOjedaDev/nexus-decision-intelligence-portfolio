@@ -120,7 +120,12 @@ function actionableReview(item) {
 }
 function executionExpired(item) {
   const deadline = Date.parse(item.approval_expires_at);
-  return reviewExpired(item) || (Number.isFinite(deadline) && deadline <= serverNow());
+  return item.approval_renewable === true || reviewExpired(item) ||
+    (Number.isFinite(deadline) && deadline <= serverNow());
+}
+function canRenewApproval(item) {
+  return role() === 'approver' && item.approval_renewable === true &&
+    ['approved', 'execution_failed'].includes(item.state) && !reviewExpired(item);
 }
 function reviewCounts() {
   return {
@@ -149,6 +154,8 @@ function reviewLinkLabel(item) {
 function blockedAction(action, item) {
   if (['approve', 'reject'].includes(action) && !actionableReview(item))
     return 'This recommendation is no longer open for review. Your note has been kept.';
+  if (action === 'renew' && !canRenewApproval(item))
+    return 'This approval is no longer eligible for renewal. Your note has been kept.';
   if (action === 'execute' && executionExpired(item))
     return 'This approval has expired. Your form has been kept, but execution is no longer authorized.';
   return '';
@@ -182,7 +189,7 @@ function updateExpiryUI() {
       count.textContent = number(counts.pending);
     } else count?.remove();
   }
-  const items = [...state.recommendations, state.selected].filter(Boolean);
+  const items = [state.selected, ...state.recommendations].filter(Boolean);
   const signature = items.map(item => `${item.id}:${reviewExpired(item)}:${executionExpired(item)}`).join('|');
   if (signature !== state.expirySignature) {
     state.expirySignature = signature;
@@ -356,23 +363,37 @@ function renderOverview() {
     `<section class="kpi-grid" aria-label="Decision metrics">${kpi('Awaiting review',number(reviewCounts().pending),reviewCountNote(),'approvals',false,'data-review-kpi')}${kpi('Planned order value',money(summary.current_order_value ?? metrics.order_value),`${percent(metrics.budget_utilization)} of ${money(metrics.budget)} budget`,'currency')}${kpi('Recommended units',number(items.reduce((sum,item) => sum+numeric(item.recommended_quantity),0)),`${number(items.length)} current decisions · ${number(summary.historical)} retained in history`,'box')}${kpi('Outcomes recorded',number(summary.outcome_observed),`${number(summary.effect_count)} mock order effects · all history`,'refresh',true)}</section><div class="overview-grid"><section class="panel"><div class="panel-header"><div><h2>Demand & uncertainty</h2><p>Historical observations → ${number(overview.metadata?.horizon_days)}-day forecast</p></div><label class="sr-only" for="chart-product">Forecast product</label><select class="chart-select" id="chart-product">${items.map(item => `<option value="${escape(item.id)}"${item.id === selected?.id ? ' selected' : ''}>${escape(item.sku_id)} / ${escape(item.location_id)}</option>`).join('')}</select></div><div class="panel-body">${chart(selected)}</div><div class="panel-footer"><p>${overview.metadata?.pipeline_mode === 'connected_runtime_baseline' ? 'Fresh seasonal baseline' : 'Frozen champion'} · ${escape(dateLabel(overview.metadata?.scientific_decision_time))}</p>${badge('Empirical intervals','success')}</div></section><section class="panel" data-next-decision>${renderNextDecision()}</section></div><section class="panel"><div class="panel-header"><div><h2>Your decision workspace</h2><p>Constraint-checked plans with source evidence attached</p></div><span class="badge neutral">${number(items.length)} recommendations</span></div>${recommendationTable(items)}<div class="panel-footer"><p>Uncertainty describes interval width, not failure probability.</p><a class="text-button" href="#decisions">Open workbench ${icon('arrow')}</a></div></section>${metadataNote()}`;
 }
 
+function switchPersonaButton(persona) {
+  return `<button class="button secondary" data-persona="${persona}">Switch to ${readable(persona)}</button>`;
+}
+
 function actionButtons(item) {
   if (item.state === 'invalidated') return '<p class="callout warning">Source inputs changed, so this plan is invalidated. Generate a fresh plan before review. Its previous evidence remains available.</p>';
   if (reviewExpired(item) && item.state === 'pending')
   return '<p class="callout warning">This review window has expired. It can no longer be approved.</p>';
-  if (['approved', 'execution_failed'].includes(item.state) && executionExpired(item))
-  return '<p class="callout warning">This approval has expired. Mock execution is no longer authorized.</p>';
-  if (role() === 'auditor')
-  return '<p class="callout">Auditor view is read-only. Inspect the evidence and complete decision history below.</p>';
+  if (['approved', 'execution_failed'].includes(item.state) && executionExpired(item)) {
+    const warning = '<p class="callout warning">This approval has expired. Mock execution requires a current approval.</p>';
+    if (canRenewApproval(item))
+      return warning + `<button class="button primary" data-action="renew" data-id="${escape(item.id)}">Renew approval ${icon('approvals')}</button>`;
+    if (role() === 'approver' && !reviewExpired(item))
+      return warning + '<button class="button secondary" data-refresh>Refresh approval status</button>';
+    if (item.approval_renewable === true && !reviewExpired(item)) return warning + switchPersonaButton('approver');
+    return warning;
+  }
   if (item.state === 'pending') return role() === 'approver' ?
     `<button class="button primary" data-action="approve" data-id="${escape(item.id)}">Approve recommendation ${icon('approvals')}</button><button class="button secondary" data-action="reject" data-id="${escape(item.id)}">Reject with a reason</button>` :
-    '<p class="callout">Ready for independent review. Switch the demo persona to <strong>Approver</strong> to approve or reject this recommendation.</p>';
+    '<p class="callout">An independent Approver can approve or reject this recommendation.</p>' +
+      switchPersonaButton('approver');
   if (['approved', 'execution_failed'].includes(item.state)) return role() === 'approver' ?
     `<button class="button primary" data-action="execute" data-id="${escape(item.id)}">${item.state === 'execution_failed' ? 'Retry mock execution' : 'Execute mock order'} ${icon('arrow')}</button><button class="button secondary" data-action="revoke" data-id="${escape(item.id)}">Revoke approval</button>` :
-    '<p class="callout">The approver can now execute this order through the local mock ERP.</p>';
+    '<p class="callout">The approver can now execute this order through the local mock ERP.</p>' +
+      switchPersonaButton('approver');
   if (item.state === 'executed') return role() === 'planner' ?
     `<button class="button primary" data-action="outcome" data-id="${escape(item.id)}">Record simulated outcome ${icon('refresh')}</button><p class="field-help">Observation opens ${escape(timeLabel(item.outcome_due_at))}. The demo compresses the wait to five seconds.</p>` :
-    '<p class="callout">Execution is complete. Switch the demo persona to <strong>Planner</strong> to record the simulated outcome.</p>';
+    '<p class="callout">Execution is complete. A Planner can record the simulated outcome.</p>' +
+      switchPersonaButton('planner');
+  if (role() === 'auditor')
+    return '<p class="callout">Auditor view is read-only. Inspect the evidence and decision history below.</p>';
   if (item.state === 'outcome_observed')
   return '<p class="callout">The feedback loop is complete. The observed scenario and original execution are preserved in the audit trail.</p>';
   return '<p class="callout">This decision is closed. Its evidence remains available for review.</p>';
@@ -480,7 +501,10 @@ function renderHealth() {
   return heading('OPERATIONS / EVIDENCE', 'See the whole system.',
       'Check data quality, exercise an incident, and inspect the chain behind every action.',
       `<button class="button secondary" data-refresh>${icon('refresh')} Refresh evidence</button>`) + renderLearning() +
-    `<section class="kpi-grid section-gap" aria-label="Foundation quality metrics">${kpi('Source records',number(metrics.source_rows),'CSV and JSONL fixture','box')}${kpi('Validated records',number(metrics.accepted_rows),`${percent(metrics.source_validity_rate)} passed source contracts`,'shield')}${kpi('Quarantined records',number(metrics.quarantined_rows),'Rejected inputs retain a reason','info')}${kpi('Gold products',number(metrics.gold_products),`${number(metrics.gold_rows)} curated rows · dbt ${metrics.dbt_status || 'unknown'}`,'overview')}</section>${health ? `<div class="health-grid">${checks.map(check => `<section class="health-card"><h3>${escape(check.name)}</h3>${badge(readable(check.status),['healthy','pass','ok','verified'].includes(String(check.status).toLowerCase()) ? 'success' : ['warning','degraded'].includes(String(check.status).toLowerCase()) ? 'warning' : 'neutral')}<strong class="value">${healthValue(check.value)}</strong><p>${escape(check.detail)}</p></section>`).join('')}</div>` : '<p class="callout warning">Health evidence is unavailable. Refresh to retry the health endpoint.</p>'}<section class="panel"><div class="panel-header"><div><h2>Incident exercise</h2><p>Persisted incident state with deduplicated notification evidence</p></div>${badge(firing ? 'Incident active' : 'No active incident',firing ? 'warning' : 'success')}</div><div class="panel-body"><p class="reason">Trigger a local demonstration incident, then resolve it. Inspect its notification and state history below.</p>${role() === 'planner' ? `<div class="filter-bar"><button class="button ${firing ? 'secondary' : 'primary'}" data-incident="trigger">Trigger demo incident</button><button class="button ${firing ? 'primary' : 'secondary'}" data-incident="resolve">Resolve demo incident</button></div>` : '<p class="field-help">Switch to Planner to operate the incident exercise.</p>'}${alerts.length ? `<ol class="trace-list">${alerts.map(alert => `<li><strong>${escape(alert.message || alert.id)}</strong><p>${escape(readable(alert.status))} · ${escape(readable(alert.severity))}${alert.created_at ? ` · ${escape(timeLabel(alert.created_at))}` : ''}</p></li>`).join('')}</ol>` : '<p class="field-help">No alert records are present.</p>'}<details><summary>Inspect operational metrics and incident delivery</summary><pre>${escape(JSON.stringify(health || {},null,2))}</pre></details></div></section><section class="panel section-gap"><div class="panel-header"><div><h2>Decision audit trail</h2><p>${number(audit?.total)} events · ordered and checksum-linked</p></div><div class="audit-integrity">${icon('shield')}${escape(audit?.integrity === 'verified' ? 'Integrity verified' : 'Unavailable')}</div></div>${events.length ? `<div class="table-wrap responsive-table"><table><thead><tr><th>Event</th><th>Actor</th><th>Timestamp</th><th>Evidence</th></tr></thead><tbody>${events.map(event => `<tr><td><span class="audit-type">${escape(readable(event.event_type))}</span><span class="cell-subtitle">#${number(event.sequence)} · ${escape(event.recommendation_id)}</span></td><td data-label="Actor"><span class="cell-title">${escape(event.actor_id)}</span><span class="cell-subtitle">${escape(readable(event.actor_role))}</span></td><td data-label="Timestamp">${escape(timeLabel(event.occurred_at))}</td><td data-label="Evidence"><details><summary>Inspect record</summary><pre>${escape(JSON.stringify(event,null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div>` : empty('No decision events yet','Review a recommendation to start its audit trail.','<a class="button secondary" href="#decisions">Open recommendations</a>')}<div class="panel-footer"><p>Local integrity verification detects changed records; these hashes are not external signatures.</p><button class="text-button" data-export>${icon('download')} Export audit</button></div></section><section class="panel section-gap"><div class="panel-header"><div><h2>Source inventory</h2><p>${state.overview.metadata?.pipeline_mode === 'connected_runtime_baseline' ? 'Connected R2 source snapshot' : 'Independent R2 foundation example'} · local fixtures</p></div></div><div class="table-wrap responsive-table"><table><thead><tr><th>Dataset</th><th>Format</th><th>Rows</th><th>File evidence</th></tr></thead><tbody>${(state.overview.sources || []).map(source => `<tr><td><span class="cell-title">${escape(source.dataset)}</span><span class="cell-subtitle">${escape(source.name)}</span></td><td data-label="Format">${escape(source.format.toUpperCase())}</td><td data-label="Rows">${number(source.rows)}</td><td data-label="File evidence"><details><summary>SHA-256</summary><p class="code">${escape(source.sha256)}</p></details></td></tr>`).join('')}</tbody></table></div></section>${metadataNote()}`;
+    `<section class="kpi-grid section-gap" aria-label="Foundation quality metrics">${kpi('Source records',number(metrics.source_rows),'CSV and JSONL fixture','box')}${kpi('Validated records',number(metrics.accepted_rows),`${percent(metrics.source_validity_rate)} passed source contracts`,'shield')}${kpi('Quarantined records',number(metrics.quarantined_rows),'Rejected inputs retain a reason','info')}${kpi('Gold products',number(metrics.gold_products),`${number(metrics.gold_rows)} curated rows · dbt ${metrics.dbt_status || 'unknown'}`,'overview')}</section>${health ? `<div class="health-grid">${checks.map(check => `<section class="health-card"><h3>${escape(check.name)}</h3>${badge(readable(check.status),['healthy','pass','ok','verified'].includes(String(check.status).toLowerCase()) ? 'success' : ['warning','degraded'].includes(String(check.status).toLowerCase()) ? 'warning' : 'neutral')}<strong class="value">${healthValue(check.value)}</strong><p>${escape(check.detail)}</p></section>`).join('')}</div>` : '<p class="callout warning">Health evidence is unavailable. Refresh to retry the health endpoint.</p>'}` +
+    `<section class="panel"><div class="panel-header"><div><h2>Incident exercise</h2><p>Persisted incident state with deduplicated notification evidence</p></div>${health ? badge(firing ? 'Incident active' : 'No active incident', firing ? 'warning' : 'success') : badge('Unavailable', 'neutral')}</div><div class="panel-body">${health ? `<p class="reason">Trigger a local demonstration incident, then resolve it. Inspect its notification and state history below.</p>${role() === 'planner' ? `<div class="filter-bar"><button class="button ${firing ? 'secondary' : 'primary'}" data-incident="trigger">Trigger demo incident</button><button class="button ${firing ? 'primary' : 'secondary'}" data-incident="resolve">Resolve demo incident</button></div>` : '<p class="field-help">Switch to Planner to operate the incident exercise.</p>'}${alerts.length ? `<ol class="trace-list">${alerts.map(alert => `<li><strong>${escape(alert.message || alert.id)}</strong><p>${escape(readable(alert.status))} · ${escape(readable(alert.severity))}${alert.created_at ? ` · ${escape(timeLabel(alert.created_at))}` : ''}</p></li>`).join('')}</ol>` : '<p class="field-help">No alert records are present.</p>'}<details><summary>Inspect operational metrics and incident delivery</summary><pre>${escape(JSON.stringify(health,null,2))}</pre></details>` : '<p>Incident status is unavailable. Refresh evidence to retry.</p>'}</div></section>` +
+    `<section class="panel section-gap"><div class="panel-header"><div><h2>Decision audit trail</h2><p>${audit ? `${number(audit.total)} events · ordered and checksum-linked` : 'Decision audit is unavailable'}</p></div><div class="audit-integrity">${icon('shield')}${escape(audit?.integrity === 'verified' ? 'Integrity verified' : 'Unavailable')}</div></div>${audit ? `${events.length ? `<div class="table-wrap responsive-table"><table><thead><tr><th>Event</th><th>Actor</th><th>Timestamp</th><th>Evidence</th></tr></thead><tbody>${events.map(event => `<tr><td><span class="audit-type">${escape(readable(event.event_type))}</span><span class="cell-subtitle">#${number(event.sequence)} · ${escape(event.recommendation_id)}</span></td><td data-label="Actor"><span class="cell-title">${escape(event.actor_id)}</span><span class="cell-subtitle">${escape(readable(event.actor_role))}</span></td><td data-label="Timestamp">${escape(timeLabel(event.occurred_at))}</td><td data-label="Evidence"><details><summary>Inspect record</summary><pre>${escape(JSON.stringify(event,null,2))}</pre></details></td></tr>`).join('')}</tbody></table></div>` : empty('No decision events yet','Review a recommendation to start its audit trail.','<a class="button secondary" href="#decisions">Open recommendations</a>')}<div class="panel-footer"><p>Local integrity verification detects changed records; these hashes are not external signatures.</p><button class="text-button" data-export>${icon('download')} Export audit</button></div>` : '<div class="panel-body"><p>Refresh evidence to retry the audit endpoint.</p></div>'}</section>` +
+    `<section class="panel section-gap"><div class="panel-header"><div><h2>Source inventory</h2><p>${state.overview.metadata?.pipeline_mode === 'connected_runtime_baseline' ? 'Connected R2 source snapshot' : 'Independent R2 foundation example'} · local fixtures</p></div></div><div class="table-wrap responsive-table"><table><thead><tr><th>Dataset</th><th>Format</th><th>Rows</th><th>File evidence</th></tr></thead><tbody>${(state.overview.sources || []).map(source => `<tr><td><span class="cell-title">${escape(source.dataset)}</span><span class="cell-subtitle">${escape(source.name)}</span></td><td data-label="Format">${escape(source.format.toUpperCase())}</td><td data-label="Rows">${number(source.rows)}</td><td data-label="File evidence"><details><summary>SHA-256</summary><p class="code">${escape(source.sha256)}</p></details></td></tr>`).join('')}</tbody></table></div></section>${metadataNote()}`;
 }
 
 function renderCopilot() {
@@ -496,12 +520,17 @@ function renderAnswer(answer) {
   return `<div class="answer-box"><span class="eyebrow">${answer.mode === 'deterministic-evidence' ? 'REFERENCE ANSWER' : 'EVIDENCE RESPONSE'}</span>${escape(answer.answer)}</div><div class="answer-citations">${(answer.citations || []).map((citation,index) => `<div class="citation"><strong>[${index+1}] ${escape(citation.title)}</strong><p class="code">${escape(citation.path)}</p><p>${escape(citation.excerpt)}</p></div>`).join('')}</div>`;
 }
 async function loadOverview() {
-  state.overview = await request('/api/overview');
-  const checked = Date.parse(state.overview.checked_at);
+  const session = state.session;
+  const overview = await request('/api/overview');
+  const recommendations = overview.recommendations || (await request('/api/recommendations')).items;
+  if (session !== state.session) return false;
+  state.overview = overview;
+  state.recommendations = recommendations;
+  const checked = Date.parse(overview.checked_at);
   state.serverTime = Number.isFinite(checked) ? checked : Date.now();
   state.serverTimeReadAt = performance.now();
-  state.recommendations = state.overview.recommendations || (await request('/api/recommendations')).items;
   scheduleExpiryCheck();
+  return true;
 }
 async function renderRoute({
   focus = false
@@ -511,7 +540,9 @@ async function renderRoute({
   const active = navItems.some(([key]) => key === page) ? page : 'overview';
   nav(active);
   const main = $('#main');
+  let complete = true;
   try {
+    if (active !== 'decisions' || !id) state.selected = null;
     if (active === 'decisions' && id) {
       main.innerHTML =
         '<div class="loading-state" role="status"><span class="loading-mark"></span><h2>Loading recommendation</h2></div>';
@@ -528,8 +559,8 @@ async function renderRoute({
       state.health = results[0].status === 'fulfilled' ? results[0].value : null;
       state.audit = results[1].status === 'fulfilled' ? results[1].value : null;
       state.learning = results[2].status === 'fulfilled' ? results[2].value : null;
+      complete = results.every(result => result.status === 'fulfilled');
       main.innerHTML = renderHealth();
-      if (results[1].status === 'rejected') notice(results[1].reason.message, true);
     } else {
       main.innerHTML = ({
         overview: renderOverview,
@@ -544,19 +575,26 @@ async function renderRoute({
     if (focus) main.focus({
       preventScroll: true
     });
+    return complete;
   } catch (error) {
     if (version !== state.routeVersion) return;
     main.innerHTML = empty('This view could not be loaded', error.message,
       '<button class="button primary" data-refresh>Try again</button>');
+    if (focus) $('#main [data-refresh]')?.focus();
+    return false;
   }
 }
 async function openAction(action, id) {
+  const session = state.session;
+  const hash = location.hash;
   try {
     const item = await request(`/api/recommendations/${encodeURIComponent(id)}`);
+    if (state.session !== session || location.hash !== hash) return;
     const refusal = blockedAction(action, item);
     if (refusal) throw new Error(refusal);
     const titles = {
       approve: 'Approve this recommendation?',
+      renew: 'Renew this approval?',
       reject: 'Reject this recommendation?',
       revoke: 'Revoke this approval?',
       execute: 'Execute this mock order?',
@@ -564,6 +602,7 @@ async function openAction(action, id) {
     };
     const descriptions = {
       approve: 'Your approval authorizes the exact plan shown below. It is recorded separately from the planner who created the recommendation.',
+      renew: 'Renew authorization for this exact plan and record a new decision note.',
       reject: 'Record why this recommendation should not proceed. The original plan and evidence remain available.',
       revoke: 'Revoke permission to execute this recommendation. Your reason becomes part of its decision history.',
       execute: 'Create one order effect in the local mock ERP. This demonstration does not contact a supplier or spend money.',
@@ -583,6 +622,7 @@ async function openAction(action, id) {
     $('#note-field').hidden = action === 'execute';
     $('#confirm-action').textContent = {
       approve: 'Approve recommendation',
+      renew: 'Renew approval',
       reject: 'Reject recommendation',
       revoke: 'Revoke approval',
       execute: 'Execute mock order',
@@ -596,9 +636,36 @@ async function openAction(action, id) {
     notice(error.message, true);
   }
 }
-async function refresh() {
-  await loadOverview();
-  await renderRoute();
+async function refresh(options) {
+  if (await loadOverview()) return renderRoute(options);
+}
+function showRefreshRetry(title, message) {
+  $('#main').innerHTML = empty(title, message,
+    '<button class="button primary" data-refresh>Refresh workspace</button>');
+}
+function focusReview() {
+  const target = $('#main [data-review-actions] button') || $('#main [data-refresh]') || $('#main');
+  target.focus({preventScroll: true});
+}
+async function refreshAfterSave(message, reviewHash) {
+  notice(message);
+  const hash = location.hash;
+  if (hash === reviewHash) {
+    const actions = $('#main [data-review-actions]');
+    if (actions) actions.innerHTML = `<p class="callout" role="status">${escape(message)} Refreshing the decision…</p>`;
+  }
+  try {
+    if (await refresh() === false) {
+      const warning = `${message} Some updated information is unavailable. Refresh to retry.`;
+      if (location.hash === reviewHash) showRefreshRetry('Decision saved', warning);
+      notice(warning, true);
+    }
+  } catch {
+    const warning = `${message} Workspace refresh failed. Refresh to retry.`;
+    if (location.hash === hash) showRefreshRetry('Change saved', warning);
+    notice(warning, true);
+  }
+  if (location.hash === reviewHash) focusReview();
 }
 async function initialize() {
   try {
@@ -619,28 +686,49 @@ async function initialize() {
       '<button class="button primary" data-initialize>Reconnect workspace</button>');
   }
 }
-$('#persona').addEventListener('change', async event => {
-  const control = event.currentTarget,
-    previous = role();
+async function switchPersona(persona, trigger) {
+  const control = $('#persona');
+  if (control.disabled) return;
+  const hash = location.hash;
   control.disabled = true;
+  if (trigger) trigger.disabled = true;
   try {
     $('#action-dialog').close();
     state.session = await request('/api/session', {
       method: 'POST',
       body: {
-        persona: control.value
+        persona
       }
     });
-    state.localAnswer = null;
+    control.value = role();
     $('#persona-avatar').textContent = role().slice(0, 2).toUpperCase();
-    await refresh();
-    notice(`Now acting as ${readable(role())}. Permissions are checked by the server.`);
+    state.routeVersion++;
+    state.overview = null;
+    state.recommendations = [];
+    state.selected = null;
+    state.answer = null;
+    state.localAnswer = null;
+    nav(hash.slice(1).split('/')[0] || 'overview');
+    $('#main').innerHTML = '<div class="loading-state" role="status"><span class="loading-mark"></span><h2>Loading workspace</h2></div>';
+    const message = `Now acting as ${readable(role())}.`;
+    try {
+      if (await refresh() === false) notice(`${message} Some workspace information is unavailable.`, true);
+      else notice(message);
+    } catch {
+      showRefreshRetry('Workspace refresh needed', `${message} Refresh to load this persona’s workspace.`);
+      notice(`${message} Workspace refresh failed.`, true);
+    }
+    if (trigger && location.hash === hash) focusReview();
   } catch (error) {
-    control.value = previous;
     notice(error.message, true);
   } finally {
+    control.value = role();
     control.disabled = false;
+    if (trigger) trigger.disabled = false;
   }
+}
+$('#persona').addEventListener('change', event => {
+  return switchPersona(event.currentTarget.value);
 });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -666,6 +754,11 @@ $('#main').addEventListener('change', event => {
   }
 });
 $('#main').addEventListener('click', async event => {
+  const persona = event.target.closest('[data-persona]');
+  if (persona) {
+    await switchPersona(persona.dataset.persona, persona);
+    return;
+  }
   const action = event.target.closest('[data-action]');
   if (action) {
     await openAction(action.dataset.action, action.dataset.id);
@@ -690,8 +783,9 @@ $('#main').addEventListener('click', async event => {
   }
   if (event.target.closest('[data-refresh]')) {
     try {
-      await refresh();
-      notice('Evidence refreshed.');
+      const complete = await refresh({focus: true});
+      if (complete) notice('Evidence refreshed.');
+      if (complete === false) notice('Some workspace information is unavailable. Refresh to retry.', true);
     } catch (error) {
       notice(error.message, true);
     }
@@ -707,8 +801,7 @@ $('#main').addEventListener('click', async event => {
           action: incident.dataset.incident
         }
       });
-      await refresh();
-      notice(incident.dataset.incident === 'trigger' ?
+      await refreshAfterSave(incident.dataset.incident === 'trigger' ?
         'Demo incident triggered. Inspect the persisted alert evidence.' :
         'Demo incident resolved. Recovery evidence recorded.');
     } catch (error) {
@@ -717,7 +810,7 @@ $('#main').addEventListener('click', async event => {
     }
     return;
   }
-  if (event.target.closest('[data-export]')) {
+  if (state.audit && event.target.closest('[data-export]')) {
     const blob = new Blob([JSON.stringify(state.audit, null, 2)], {
       type: 'application/json'
     });
@@ -790,12 +883,16 @@ $('#close-dialog').addEventListener('click', () => $('#action-dialog').close());
 $('#cancel-dialog').addEventListener('click', () => $('#action-dialog').close());
 $('#action-form').addEventListener('submit', async event => {
   event.preventDefault();
-  if (!state.action) return;
+  const confirmation = state.action;
+  if (!confirmation) return;
+  const button = $('#confirm-action');
+  if (button.disabled) return;
   const {
     action,
     item,
     key
-  } = state.action;
+  } = confirmation;
+  const reviewHash = location.hash;
   const refusal = blockedAction(action, item);
   if (refusal) {
     $('#dialog-error').textContent = refusal;
@@ -803,8 +900,7 @@ $('#action-form').addEventListener('submit', async event => {
     $('#confirm-action').disabled = true;
     return;
   }
-  const button = $('#confirm-action'),
-    oldText = button.textContent;
+  const oldText = button.textContent;
   button.disabled = true;
   button.textContent = 'Saving…';
   $('#dialog-error').hidden = true;
@@ -820,30 +916,42 @@ $('#action-form').addEventListener('submit', async event => {
     $('#action-note').focus();
     return;
   }
+  let saved;
   try {
-    await request(`/api/recommendations/${encodeURIComponent(item.id)}/${action}`, {
+    const endpoint = action === 'renew' ? 'approve' : action;
+    saved = await request(`/api/recommendations/${encodeURIComponent(item.id)}/${endpoint}`, {
       method: 'POST',
       body,
       headers: action === 'execute' ? {
         'Idempotency-Key': key
       } : {}
     });
-    $('#action-dialog').close();
-    await refresh();
-    notice({
-      approve: 'Recommendation approved. You can now execute its mock order.',
-      reject: 'Recommendation rejected. Your reason is in the audit trail.',
-      revoke: 'Approval revoked. The decision history has been preserved.',
-      execute: 'Mock order executed. Switch to Planner to record the simulated outcome.',
-      outcome: 'Outcome recorded. The decision feedback loop is complete.'
-    } [action]);
   } catch (error) {
-    $('#dialog-error').textContent = error.message;
-    $('#dialog-error').hidden = false;
+    if (state.action === confirmation && $('#action-dialog').open) {
+      $('#dialog-error').textContent = error.message;
+      $('#dialog-error').hidden = false;
+    } else notice(error.message, true);
+    return;
   } finally {
-    button.disabled = false;
-    button.textContent = oldText;
+    if (state.action === confirmation) {
+      button.disabled = Boolean(blockedAction(action, item));
+      button.textContent = oldText;
+    }
   }
+  if (state.action === confirmation) {
+    state.action = null;
+    $('#action-dialog').close();
+  }
+  const message = {
+    approve: 'Recommendation approved.',
+    renew: 'Approval renewed.',
+    reject: 'Recommendation rejected. Your reason is in the audit trail.',
+    revoke: 'Approval revoked. The decision history has been preserved.',
+    execute: saved.state === 'execution_failed' ? 'Mock execution failed. The failure was recorded.' :
+      'Mock order executed. Switch to Planner to record the simulated outcome.',
+    outcome: 'Outcome recorded. The decision feedback loop is complete.'
+  }[action];
+  await refreshAfterSave(message, reviewHash);
 });
 $('.skip-link').addEventListener('click', event => {
   event.preventDefault();

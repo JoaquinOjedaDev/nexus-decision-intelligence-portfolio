@@ -1,10 +1,16 @@
 # NEXUS Decision Intelligence
 
-NEXUS turns uncertain demand into replenishment recommendations that a person can inspect, approve, and trace to a simulated outcome. It is a runnable local portfolio project spanning data engineering, forecasting, optimization, and product controls.
+NEXUS helps a supply planner decide how much to reorder when demand is uncertain and budget, supplier capacity, and storage are limited. This local demo follows a replenishment decision from forecast to human approval and simulated outcome.
 
-![NEXUS control tower](docs/portfolio/assets/overview-desktop.png)
+**[Watch the 4-minute, 22-second walkthrough](docs/portfolio/assets/portfolio-walkthrough.webm).** The recording uses synthetic data and requires no setup.
 
-**Source data → trusted tables → forecast → constrained plan → human approval → mock order → feedback**
+## One replenishment decision
+
+With 32 units of `SKU-00001` on hand at `LOC-002`, NEXUS recommends ordering 100 units at an estimated cost of $733. The planner reviews the forecast and constraints. A separate approver authorizes that exact recommendation and requests a mock purchase order. An execution retry returns the same order reference, and the audit trail records the execution and simulated outcome.
+
+![Approver reviewing the 100-unit replenishment recommendation](docs/portfolio/assets/decision-desktop.png)
+
+The [local verification record](docs/portfolio/VERIFICATION.md) covers approval binding, mock execution retries, and the outcome after restart.
 
 ## Run the local demo
 
@@ -45,9 +51,9 @@ The [five-minute demo script](docs/portfolio/DEMO.md) gives the click path. The 
 | Example plan | Four recommendations, $2,974 within a $3,600 synthetic budget |
 | Locked dependency audit | 180 packages, no known vulnerabilities in the 2026-11-21 local scan |
 
-The default demonstration uses synthetic data, a frozen checksum-verified seasonal champion, SQLite state, demo personas, and mock ERP effects. The learned challenger failed its promotion checks and remains out of service. The R2 data-quality example and frozen R3B forecast fixture have separate provenance; no join between them is invented. Costs, fill rates, and outcomes are simulations, not measured customer savings.
+The default demo reads a frozen, checksum-verified seasonal forecast from the R3B fixture. Its separate R2 data-quality example validates synthetic sources and builds dbt tables. The learned challenger failed its promotion checks, so the seasonal baseline remains in use. The demo uses SQLite state, demo personas, and mock ERP effects. Costs, fill rates, and outcomes are simulated.
 
-A separate [connected runtime](docs/portfolio/CONNECTED_RUNTIME.md) links fresh Gold tables to a seasonal forecast and a new approval-safe plan. The repository also contains gated PostgreSQL, Redpanda, Dagster, MLflow, and recovery experiments. Those paths do not turn this local release into a production service. Original distributed G2–G7 scale, recovery, soak, deployment, and prospective model-switch gates remain open. Read the [security boundaries](docs/portfolio/SECURITY.md) before changing deployment settings.
+The optional [connected runtime](docs/portfolio/CONNECTED_RUNTIME.md) builds fresh Gold tables from validated synthetic inputs and uses them to generate a new 14-day seasonal forecast and constrained plan for human review. The repository also contains gated PostgreSQL, Redpanda, Dagster, MLflow, and recovery experiments. Original distributed G2–G7 scale, recovery, soak, deployment, and prospective model-switch gates remain open. Read the [security boundaries](docs/portfolio/SECURITY.md) before changing deployment settings.
 
 ## Optional local AI explanation
 

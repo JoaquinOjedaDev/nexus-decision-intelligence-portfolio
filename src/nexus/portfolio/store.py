@@ -440,7 +440,19 @@ class PortfolioStore:
         if invalid:
             raise StoreError("integrity_error", "Workflow state disagrees with its audit history")
 
+    @staticmethod
+    def _approval_renewable(row: sqlite3.Row, now: float) -> bool:
+        return (
+            row["state"] in {"approved", "execution_failed"}
+            and row["approval_actor"] is not None
+            and row["approval_actor"] != row["creator"]
+            and row["approval_fingerprint"] == row["fingerprint"]
+            and row["approval_expires_at"] is not None
+            and row["approval_expires_at"] <= now < row["valid_until"]
+        )
+
     def _public(self, row: sqlite3.Row) -> dict[str, Any]:
+        now = self.clock()
         value: dict[str, Any] = json.loads(row["payload"])
         value.update(
             {
@@ -451,14 +463,15 @@ class PortfolioStore:
                 "approval_expires_at": (
                     iso(row["approval_expires_at"]) if row["approval_expires_at"] else None
                 ),
+                "approval_renewable": self._approval_renewable(row, now),
                 "execution_ref": row["execution_ref"],
                 "outcome_due_at": iso(row["outcome_due_at"]) if row["outcome_due_at"] else None,
                 "outcome": json.loads(row["outcome_json"]) if row["outcome_json"] else None,
-                "expired": self.clock() >= row["valid_until"],
+                "expired": now >= row["valid_until"],
                 "outcome_ready": bool(
                     row["state"] == "executed"
                     and row["outcome_due_at"] is not None
-                    and self.clock() >= row["outcome_due_at"]
+                    and now >= row["outcome_due_at"]
                 ),
             }
         )
@@ -513,26 +526,28 @@ class PortfolioStore:
             if actor.actor_id == row["creator"]:
                 raise StoreError("maker_checker", "The maker cannot approve their own work", 403)
             target = {"approve": "approved", "reject": "rejected", "revoke": "revoked"}[action]
-            if row["state"] == target:
-                if action != "approve":
-                    return self._public(row)
+            now = self.clock()
+            if row["state"] == target and action != "approve":
+                return self._public(row)
+            if action == "approve" and row["state"] in {"approved", "execution_failed"}:
                 if row["approval_actor"] != actor.actor_id:
                     raise StoreError("illegal_transition", "Another approver owns this approval")
                 if (
-                    row["approval_expires_at"] is not None
-                    and self.clock() < row["approval_expires_at"]
+                    row["state"] == "approved"
+                    and row["approval_expires_at"] is not None
+                    and now < row["approval_expires_at"]
                 ):
                     return self._public(row)
             if action == "revoke":
-                legal = {"approved", "execution_failed"}
-            elif action == "approve":
-                legal = {"pending", "approved"}
+                allowed = row["state"] in {"approved", "execution_failed"}
             else:
-                legal = {"pending"}
-            if row["state"] not in legal:
+                allowed = row["state"] == "pending" or (
+                    action == "approve" and self._approval_renewable(row, now)
+                )
+            if not allowed:
                 raise StoreError("illegal_transition", f"Cannot {action} from {row['state']}")
             if action == "approve":
-                expiry = min(row["valid_until"], self.clock() + APPROVAL_TTL_SECONDS)
+                expiry = min(row["valid_until"], now + APPROVAL_TTL_SECONDS)
                 db.execute(
                     """UPDATE recommendations SET state=?,approval_actor=?,
                     approval_fingerprint=?,approval_expires_at=? WHERE id=?""",

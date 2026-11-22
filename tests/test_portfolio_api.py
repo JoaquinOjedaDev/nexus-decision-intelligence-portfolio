@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from nexus.portfolio import store as portfolio_store
 from nexus.portfolio.auth import COOKIE_NAME
-from nexus.portfolio.store import PortfolioStore
+from nexus.portfolio.store import APPROVAL_TTL_SECONDS, PortfolioStore
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 pytest.importorskip("jwt")
@@ -304,6 +306,84 @@ def test_http_human_approval_execution_retry_and_audit(client: TestClient) -> No
     assert client.post(base + "/outcome", json=payload, headers=headers).status_code == 403
     headers = login(client, "planner")
     assert client.post(base + "/outcome", json=payload, headers=headers).status_code == 425
+
+
+def test_failed_mock_execution_requires_renewal_after_approval_expires(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = client.app.state.portfolio_store
+    clock = [float(int(store.clock()) + 1)]
+    store.clock = lambda: clock[0]
+    headers = login(client)
+    payload = {"fingerprint": binding(client)}
+    base = "/api/recommendations/rec-one"
+    execution_headers = {**headers, "Idempotency-Key": "renewed-approval"}
+    approved = client.post(base + "/approve", json=payload, headers=headers)
+    assert approved.status_code == 200
+    failed = client.post(
+        base + "/execute",
+        json={**payload, "simulate_failure": True},
+        headers=execution_headers,
+    )
+    assert failed.json()["state"] == "execution_failed"
+    assert failed.json()["approval_renewable"] is False
+    premature = client.post(base + "/approve", json=payload, headers=headers)
+    assert premature.status_code == 409
+
+    clock[0] += APPROVAL_TTL_SECONDS
+    detail = client.get(base).json()
+    assert detail["expired"] is False
+    assert detail["approval_renewable"] is True
+    refused = client.post(base + "/execute", json=payload, headers=execution_headers)
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "approval_expired"
+    assert store.metrics_snapshot()["effect_count"] == 0
+
+    wrong_fingerprint = client.post(
+        base + "/approve", json={"fingerprint": "0" * 64}, headers=headers
+    )
+    assert wrong_fingerprint.status_code == 409
+    assert wrong_fingerprint.json()["error"]["code"] == "stale_fingerprint"
+
+    resolve_persona = portfolio_store.resolve_persona
+    with monkeypatch.context() as other_approver:
+        other_approver.setattr(
+            portfolio_store,
+            "resolve_persona",
+            lambda persona, locations: replace(
+                resolve_persona(persona, locations), actor_id="approver.other"
+            ),
+        )
+        other_headers = login(client)
+        wrong_approver = client.post(base + "/approve", json=payload, headers=other_headers)
+        assert wrong_approver.status_code == 409
+        assert wrong_approver.json()["error"]["code"] == "illegal_transition"
+
+    headers = login(client)
+    execution_headers.update(headers)
+    renewed = client.post(base + "/approve", json=payload, headers=headers)
+    assert renewed.status_code == 200
+    assert renewed.json()["state"] == "approved"
+    assert renewed.json()["fingerprint"] == payload["fingerprint"]
+    assert renewed.json()["approval_expires_at"] > approved.json()["approval_expires_at"]
+    assert renewed.json()["approval_renewable"] is False
+    executed = client.post(base + "/execute", json=payload, headers=execution_headers)
+    replay = client.post(base + "/execute", json=payload, headers=execution_headers)
+    assert executed.json()["state"] == "executed"
+    assert replay.json()["execution_ref"] == executed.json()["execution_ref"]
+    assert store.metrics_snapshot()["effect_count"] == 1
+
+    audit = client.get("/api/audit").json()
+    assert audit["integrity"] == "verified"
+    assert [item["event_type"] for item in audit["items"]] == [
+        "recommendation_created",
+        "approved",
+        "execution_requested",
+        "execution_failed",
+        "approved",
+        "execution_requested",
+        "executed",
+    ]
 
 
 @pytest.mark.parametrize(
