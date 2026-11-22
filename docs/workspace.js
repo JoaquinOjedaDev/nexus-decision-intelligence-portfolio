@@ -18,7 +18,8 @@ function node(tag, text, className) {
 const orders = snapshot.recommendations;
 const picker = element('item');
 const audit = snapshot.audit;
-const auditOrder = orders.findIndex(order => order.sku_id === audit.sku && order.location_id === audit.location);
+const historyButton = element('show-audit');
+const historyDetails = element('audit-details');
 const forecastPeak = Math.max(...orders.flatMap(order => order.forecast.map(([, , , high]) => high)));
 const forecastCeiling = Math.max(10, Math.ceil(forecastPeak / 10) * 10);
 
@@ -50,9 +51,14 @@ function renderForecast(forecast) {
   );
 }
 
+function showHistory(visible) {
+  historyDetails.hidden = !visible;
+  historyButton.setAttribute('aria-expanded', String(visible));
+  historyButton.textContent = visible ? 'Hide recorded history' : 'View recorded history';
+}
+
 function renderRecommendation() {
-  const orderIndex = Number(picker.value);
-  const order = orders[orderIndex];
+  const order = orders[Number(picker.value)];
   show('quantity', `${number.format(order.recommended_quantity)} units`);
   show('inventory', `${number.format(order.initial_inventory)} units`);
   show('purchase', usd.format(order.expected_cost));
@@ -60,12 +66,12 @@ function renderRecommendation() {
   show('supplier', `${order.supplier_id} · ${order.lead_time_days} ${leadTimeUnit}`);
   renderForecast(order.forecast);
 
-  const hasTrail = orderIndex === auditOrder;
-  element('audit-details').hidden = !hasTrail;
-  element('show-audit').hidden = hasTrail || auditOrder === -1;
+  const hasTrail = order.sku_id === audit.sku && order.location_id === audit.location;
+  showHistory(hasTrail);
+  historyButton.hidden = hasTrail;
   show('audit-summary', hasTrail
-    ? `${audit.sku} at ${audit.location}. Replay retained exactly ${audit.effects} mock order.`
-    : `The recorded approval trail covers ${audit.sku} at ${audit.location}.`);
+    ? `${audit.sku} · ${audit.location}`
+    : `Order history is available for ${audit.sku} at ${audit.location}.`);
 }
 
 function renderScenarios() {
@@ -77,7 +83,7 @@ function renderScenarios() {
   if (normal && surge && surge.expected_cost > normal.expected_cost && normal.expected_cost > 0) {
     const increase = new Intl.NumberFormat('en-US', {style: 'percent'})
       .format(surge.expected_cost / normal.expected_cost - 1);
-    show('scenario-insight', `Demand surge raised mean operating cost ${increase} over normal.`);
+    show('scenario-insight', `A demand surge costs ${increase} more than normal on average.`);
   }
 
   for (const scenario of scenarios) {
@@ -92,48 +98,40 @@ function renderScenarios() {
     if (scenario === surge) bar.classList.add('surge');
     track.append(bar);
 
-    const metrics = node('p', `${percent.format(scenario.fill_rate)} fill · ${number.format(scenario.expedite_units)} mean expedited units`);
+    const metrics = node('p', `${percent.format(scenario.fill_rate)} fill rate · ${number.format(scenario.expedite_units)} expedited units on average`);
     row.append(heading, track, metrics);
     element('scenario-values').append(row);
   }
-
-  const paths = normal && scenarios.every(scenario => scenario.evaluation_paths === normal.evaluation_paths)
-    ? ` · ${normal.evaluation_paths} synthetic paths per scenario`
-    : '';
-  show('scenario-scope', `All recommended orders${paths}. Operating costs include expediting.`);
 }
 
-const {budget, purchase_cost: purchaseTotal, solver_status: solverStatus, feasible} = snapshot.plan;
+const {budget, purchase_cost: purchaseTotal} = snapshot.plan;
 const usage = purchaseTotal / budget;
 const horizon = orders[0].forecast.length;
-show('plan-description', `A ${horizon}-day supply plan with ${orders.length} recommended orders, using synthetic data.`);
-show('cutoff', snapshot.cutoff);
-show('solver', feasible ? `${solverStatus[0]}${solverStatus.slice(1).toLowerCase()} · feasibility checked` : 'Feasibility unverified');
+const planDate = new Intl.DateTimeFormat('en-US', {dateStyle: 'long', timeZone: 'UTC'});
+show('plan-description', `${orders.length} recommended orders over ${horizon} days.`);
+element('plan-date').dateTime = snapshot.cutoff;
+show('plan-date', planDate.format(new Date(snapshot.cutoff)));
 show('purchase-total', usd.format(purchaseTotal));
 show('budget-total', `of ${usd.format(budget)}`);
-show('budget-usage', `${percent.format(usage)} allocated`);
 show('budget-left', purchaseTotal <= budget
-  ? `${usd.format(budget - purchaseTotal)} available`
+  ? `${usd.format(budget - purchaseTotal)} remaining`
   : `${usd.format(purchaseTotal - budget)} over budget`);
 element('budget-fill').style.width = `${Math.min(usage, 1) * 100}%`;
 
 for (const [index, order] of orders.entries()) {
-  picker.add(new Option(`${order.sku_id} · ${order.location_id}`, String(index)));
+  const quantity = number.format(order.recommended_quantity);
+  picker.add(new Option(`${order.sku_id} · ${order.location_id} · ${quantity} units`, String(index)));
 }
 element('chart-axis').append(...[forecastCeiling, forecastCeiling / 2, 0].map(value => node('span', String(value))));
 picker.addEventListener('change', renderRecommendation);
-element('show-audit').addEventListener('click', () => {
-  picker.value = String(auditOrder);
-  renderRecommendation();
-  picker.focus();
-});
+historyButton.addEventListener('click', () => showHistory(historyDetails.hidden));
 
 const eventLabels = {
-  recommendation_created: 'Recommendation recorded',
+  recommendation_created: 'Order recommended',
   approved: 'Independent approval',
-  execution_requested: 'Execution requested',
-  executed: 'Mock order recorded',
-  outcome_observed: 'Simulated outcome recorded',
+  execution_requested: 'Order requested',
+  executed: 'Order recorded',
+  outcome_observed: 'Outcome recorded',
 };
 for (const event of audit.events) {
   const item = node('li');
@@ -143,12 +141,6 @@ for (const event of audit.events) {
 show('execution', audit.execution_ref);
 show('received', `${number.format(audit.received)} units`);
 show('observed', `${number.format(audit.demand)} units`);
-
-const validation = snapshot.validation;
-show('validation',
-  `${validation.accepted} of ${validation.records} source records passed validation. ` +
-  `${validation.quarantined} were quarantined. ${validation.dbt_checks} dbt checks and ` +
-  `${validation.workflow_checks} connected workflow checks passed.`);
 
 renderRecommendation();
 renderScenarios();

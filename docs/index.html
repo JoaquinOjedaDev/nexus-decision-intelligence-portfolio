@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Review a 14-day replenishment plan, demand forecast, scenario costs, and recorded approval evidence.">
+  <meta name="description" content="Explore recommended orders, demand forecasts, and supply scenarios in NEXUS.">
   <meta name="theme-color" content="#122b28">
   <title>NEXUS | Replenishment plan</title>
   <link rel="icon" href="data:,">
@@ -12,41 +12,38 @@
   <script src="./workspace.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to analysis</a>
+  <a class="skip-link" href="#main">Skip to plan</a>
   <header class="masthead">
     <div class="frame masthead-inner">
       <a class="wordmark" href="./index.html">NEXUS</a>
-      <nav aria-label="Project navigation">
+      <nav aria-label="Plan navigation">
         <a href="#recommendation">Orders</a>
         <a href="#scenarios">Scenarios</a>
-        <a href="#workflow">Approval trail</a>
+        <a href="#workflow">Order history</a>
         <a class="source-link" href="https://github.com/JoaquinOjedaDev/nexus-decision-intelligence-portfolio">Source code</a>
       </nav>
     </div>
   </header>
 
-  <main id="main" class="frame">
+  <main id="main" class="frame" tabindex="-1">
     <section class="plan" aria-labelledby="plan-title">
       <div>
         <h1 id="plan-title">Replenishment plan</h1>
-        <p class="plan-description" id="plan-description">A recorded 14-day supply plan using synthetic data.</p>
-        <dl class="plan-facts">
-          <div><dt>Planning cutoff</dt><dd id="cutoff">…</dd></div>
-          <div><dt>Solver result</dt><dd id="solver">…</dd></div>
-        </dl>
+        <p class="plan-description" id="plan-description"></p>
+        <p class="plan-context"><time id="plan-date"></time><span>Simulated data</span></p>
       </div>
       <div class="budget-panel">
         <h2>Purchase budget</h2>
         <p class="budget-value"><strong id="purchase-total">…</strong> <span id="budget-total"></span></p>
         <div class="budget-track" aria-hidden="true"><span id="budget-fill"></span></div>
-        <p class="budget-caption"><span id="budget-usage"></span><span id="budget-left"></span></p>
+        <p class="budget-caption" id="budget-left"></p>
       </div>
     </section>
 
-    <noscript><p>Enable JavaScript to explore the recorded planning evidence.</p></noscript>
+    <noscript><p>Enable JavaScript to view the plan.</p></noscript>
 
     <div class="analysis-grid">
-      <section id="recommendation" class="panel" aria-labelledby="recommendation-title">
+      <section id="recommendation" class="panel" aria-labelledby="recommendation-title" tabindex="-1">
         <div class="section-head">
           <h2 id="recommendation-title">Recommended order</h2>
           <label class="picker" for="item">Product and location
@@ -62,7 +59,7 @@
         <div class="forecast">
           <div class="section-head">
             <h3>Daily demand forecast</h3>
-            <p class="legend"><span>P10 to P90</span> <span>Median</span></p>
+            <p class="legend"><span>Forecast range</span> <span>Median</span></p>
           </div>
           <p class="chart-unit" aria-hidden="true">Units per day</p>
           <div class="forecast-grid" aria-hidden="true">
@@ -73,7 +70,7 @@
             </div>
           </div>
           <details>
-            <summary>Daily forecast values</summary>
+            <summary>View daily forecast</summary>
             <table>
               <thead><tr><th scope="col">Date</th><th scope="col">P10</th><th scope="col">Median</th><th scope="col">P90</th></tr></thead>
               <tbody id="forecast-values"></tbody>
@@ -82,36 +79,30 @@
         </div>
       </section>
 
-      <section id="scenarios" class="panel" aria-labelledby="scenarios-title">
-        <h2 id="scenarios-title">Scenario trade-offs</h2>
+      <section id="scenarios" class="panel" aria-labelledby="scenarios-title" tabindex="-1">
+        <h2 id="scenarios-title">Plan-wide scenarios</h2>
         <p class="scenario-insight" id="scenario-insight"></p>
-        <p class="chart-unit">Mean operating cost</p>
+        <p class="chart-unit">Average operating cost</p>
         <ul class="scenarios" id="scenario-values" aria-label="Scenario operating costs and fill rates"></ul>
-        <p class="section-note" id="scenario-scope"></p>
+        <p class="section-note">Operating costs include expedited supply.</p>
       </section>
     </div>
 
-    <section id="workflow" class="panel workflow" aria-labelledby="workflow-title">
+    <section id="workflow" class="panel workflow" aria-labelledby="workflow-title" tabindex="-1">
       <div>
-        <h2 id="workflow-title">Approval trail</h2>
+        <h2 id="workflow-title">Order history</h2>
         <p class="section-note" id="audit-summary" role="status"></p>
-        <button class="return-button" id="show-audit" type="button" hidden>View recorded order</button>
+        <button class="history-button" id="show-audit" type="button" aria-controls="audit-details" aria-expanded="false" hidden>View recorded history</button>
       </div>
       <div id="audit-details">
         <ol class="events" id="audit-events"></ol>
         <dl class="audit-facts">
-          <div><dt>Mock order reference</dt><dd id="execution">…</dd></div>
+          <div><dt>Order reference</dt><dd id="execution">…</dd></div>
           <div><dt>Received</dt><dd id="received">…</dd></div>
-          <div><dt>Simulated demand</dt><dd id="observed">…</dd></div>
+          <div><dt>Demand observed</dt><dd id="observed">…</dd></div>
         </dl>
       </div>
     </section>
-
-    <footer class="evidence">
-      <h2>Run validation</h2>
-      <p id="validation"></p>
-      <p>Read-only record. Orders, demand, and outcomes are synthetic.</p>
-    </footer>
   </main>
 </body>
 </html>
