@@ -644,8 +644,9 @@ function showRefreshRetry(title, message) {
     '<button class="button primary" data-refresh>Refresh workspace</button>');
 }
 function focusReview() {
-  const target = $('#main [data-review-actions] button') || $('#main [data-refresh]') || $('#main');
-  target.focus({preventScroll: true});
+  const action = $('#main [data-review-actions] button') || $('#main [data-refresh]');
+  action?.scrollIntoView({block: 'center', inline: 'nearest'});
+  (action || $('#main')).focus({preventScroll: true});
 }
 async function refreshAfterSave(message, reviewHash) {
   notice(message);

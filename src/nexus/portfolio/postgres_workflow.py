@@ -761,6 +761,7 @@ class PostgresWorkflowStore(PostgresBackend):
             approval_expires_at=iso(row["approval_expires_at"])
             if row["approval_expires_at"]
             else None,
+            approval_renewable=False,
             execution_ref=row["execution_ref"],
             outcome_due_at=iso(row["outcome_due_at"]) if row["outcome_due_at"] else None,
             outcome=json.loads(row["outcome_json"]) if row["outcome_json"] else None,

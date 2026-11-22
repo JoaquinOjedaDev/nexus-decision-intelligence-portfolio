@@ -152,11 +152,12 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(process.argv[1], 'utf8').replace(/\ninitialize\(\);\s*$/, '\n');
 const fixed = new Map();
-let focused;
+let focused, scrolled;
 function element(selector) {
   if (!fixed.has(selector)) fixed.set(selector, {
     events: {}, disabled: false, hidden: true, open: false, innerHTML: '', textContent: '',
     addEventListener(type, handler) { this.events[type] = handler; },
+    scrollIntoView() { scrolled = selector; },
     focus() { focused = selector; },
     close() { this.open = false; },
     showModal() { this.open = true; }
@@ -179,7 +180,7 @@ const select = selector => {
 };
 const sandbox = {
   assert, console, crypto: {randomUUID: () => 'fixture-key'}, performance: {now: () => 0},
-  setTimeout: () => 0, clearTimeout() {}, getFocus: () => focused,
+  setTimeout: () => 0, clearTimeout() {}, getFocus: () => focused, getScroll: () => scrolled,
   document: {querySelector: select, querySelectorAll: () => [], addEventListener() {}},
   window: {addEventListener() {}}, location: {hash: '#decisions/fixture'}
 };
@@ -234,6 +235,7 @@ const checks = `
   await save(pending, 'approve');
   assert.equal($('#notice').textContent, 'Recommendation approved.');
   assert.equal(getFocus(), '#main [data-review-actions] button');
+  assert.equal(getScroll(), getFocus());
 
   const expiredApproval = {...approved, approval_expires_at: '2000-01-01T00:00:00Z'};
   respond({[detail]: expiredApproval});
