@@ -30,7 +30,6 @@
       <div>
         <h1 id="plan-title">Replenishment plan</h1>
         <p class="plan-description" id="plan-description"></p>
-        <p class="plan-context"><time id="plan-date"></time><span>Simulated data</span></p>
       </div>
       <div class="budget-panel">
         <h2>Purchase budget</h2>
@@ -90,11 +89,10 @@
 
     <section id="workflow" class="panel workflow" aria-labelledby="workflow-title" tabindex="-1">
       <div>
-        <h2 id="workflow-title">Order history</h2>
-        <p class="section-note" id="audit-summary" role="status"></p>
-        <button class="history-button" id="show-audit" type="button" aria-controls="audit-details" aria-expanded="false" hidden>View recorded history</button>
+        <h2 id="workflow-title">Recorded order history</h2>
+        <p class="section-note" id="audit-order"></p>
       </div>
-      <div id="audit-details">
+      <div>
         <ol class="events" id="audit-events"></ol>
         <dl class="audit-facts">
           <div><dt>Order reference</dt><dd id="execution">…</dd></div>

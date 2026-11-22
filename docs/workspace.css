@@ -19,8 +19,7 @@ h1, h2, h3, p, dl { margin: 0; }
 h2 { font-size: 1.25rem; letter-spacing: -.025em; line-height: 1.2; }
 h3 { font-size: .96rem; }
 a { color: var(--teal); text-underline-offset: .2em; }
-:where(a, button, select, summary):focus-visible { outline: 3px solid #187b67; outline-offset: 3px; }
-[hidden] { display: none !important; }
+:where(a, select, summary):focus-visible { outline: 3px solid #187b67; outline-offset: 3px; }
 .frame { width: min(1200px, calc(100% - 64px)); margin-inline: auto; }
 main.frame { padding-bottom: clamp(1.5rem, 4vw, 3rem); }
 .skip-link { position: absolute; left: 1rem; top: -5rem; padding: .6rem; background: white; }
@@ -45,8 +44,6 @@ nav a:hover { text-decoration: underline; }
 }
 h1 { font-size: clamp(2.5rem, 5.1vw, 4.6rem); letter-spacing: -.063em; line-height: 1.02; }
 .plan-description { margin-top: .8rem; color: var(--muted); font-size: 1.06rem; max-width: 42ch; }
-.plan-context { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; margin-top: .7rem; color: var(--muted); font-size: .88rem; }
-.plan-context span::before { content: "·"; margin-inline-end: .65rem; }
 .audit-facts { display: flex; flex-wrap: wrap; gap: .8rem 1.5rem; }
 dt { color: var(--muted); font-size: .8rem; }
 dd { margin: .14rem 0 0; font-weight: 675; font-variant-numeric: tabular-nums; }
@@ -66,7 +63,7 @@ dd { margin: .14rem 0 0; font-weight: 675; font-variant-numeric: tabular-nums; }
 .panel { padding: clamp(1rem, 2.3vw, 1.6rem); border: 1px solid var(--line); border-radius: 14px; background: #fff; scroll-margin-top: 1rem; }
 .section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .65rem 1rem; }
 .picker { display: grid; gap: .2rem; max-width: 100%; font-size: .8rem; font-weight: 650; color: var(--muted); }
-select, .history-button {
+select {
   min-height: 44px;
   padding: .48rem .65rem;
   border: 1px solid #759b8b;
@@ -150,8 +147,6 @@ th, td { text-align: start; font-variant-numeric: tabular-nums; padding: .3rem .
 .events span { display: block; color: var(--muted); font-size: .8rem; text-transform: capitalize; }
 .audit-facts { margin-top: .9rem; padding-top: .75rem; border-top: 1px solid var(--line); font-size: .9rem; }
 #execution { font-size: .84rem; overflow-wrap: anywhere; }
-.history-button { margin-top: .55rem; cursor: pointer; font-size: .88rem; font-weight: 650; color: var(--teal); }
-.history-button:hover { background: #e7f4ed; }
 
 @media (max-width: 920px) {
   .frame { width: calc(100% - 40px); }

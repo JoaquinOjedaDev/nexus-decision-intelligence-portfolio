@@ -17,9 +17,6 @@ function node(tag, text, className) {
 
 const orders = snapshot.recommendations;
 const picker = element('item');
-const audit = snapshot.audit;
-const historyButton = element('show-audit');
-const historyDetails = element('audit-details');
 const forecastPeak = Math.max(...orders.flatMap(order => order.forecast.map(([, , , high]) => high)));
 const forecastCeiling = Math.max(10, Math.ceil(forecastPeak / 10) * 10);
 
@@ -51,12 +48,6 @@ function renderForecast(forecast) {
   );
 }
 
-function showHistory(visible) {
-  historyDetails.hidden = !visible;
-  historyButton.setAttribute('aria-expanded', String(visible));
-  historyButton.textContent = visible ? 'Hide recorded history' : 'View recorded history';
-}
-
 function renderRecommendation() {
   const order = orders[Number(picker.value)];
   show('quantity', `${number.format(order.recommended_quantity)} units`);
@@ -65,13 +56,6 @@ function renderRecommendation() {
   const leadTimeUnit = order.lead_time_days === 1 ? 'day' : 'days';
   show('supplier', `${order.supplier_id} · ${order.lead_time_days} ${leadTimeUnit}`);
   renderForecast(order.forecast);
-
-  const hasTrail = order.sku_id === audit.sku && order.location_id === audit.location;
-  showHistory(hasTrail);
-  historyButton.hidden = hasTrail;
-  show('audit-summary', hasTrail
-    ? `${audit.sku} · ${audit.location}`
-    : `Order history is available for ${audit.sku} at ${audit.location}.`);
 }
 
 function renderScenarios() {
@@ -107,10 +91,7 @@ function renderScenarios() {
 const {budget, purchase_cost: purchaseTotal} = snapshot.plan;
 const usage = purchaseTotal / budget;
 const horizon = orders[0].forecast.length;
-const planDate = new Intl.DateTimeFormat('en-US', {dateStyle: 'long', timeZone: 'UTC'});
 show('plan-description', `${orders.length} recommended orders over ${horizon} days.`);
-element('plan-date').dateTime = snapshot.cutoff;
-show('plan-date', planDate.format(new Date(snapshot.cutoff)));
 show('purchase-total', usd.format(purchaseTotal));
 show('budget-total', `of ${usd.format(budget)}`);
 show('budget-left', purchaseTotal <= budget
@@ -124,8 +105,8 @@ for (const [index, order] of orders.entries()) {
 }
 element('chart-axis').append(...[forecastCeiling, forecastCeiling / 2, 0].map(value => node('span', String(value))));
 picker.addEventListener('change', renderRecommendation);
-historyButton.addEventListener('click', () => showHistory(historyDetails.hidden));
 
+const audit = snapshot.audit;
 const eventLabels = {
   recommendation_created: 'Order recommended',
   approved: 'Independent approval',
@@ -138,6 +119,7 @@ for (const event of audit.events) {
   item.append(node('strong', eventLabels[event.event_type]), node('span', event.actor_role));
   element('audit-events').append(item);
 }
+show('audit-order', `${audit.sku} at ${audit.location}`);
 show('execution', audit.execution_ref);
 show('received', `${number.format(audit.received)} units`);
 show('observed', `${number.format(audit.demand)} units`);
