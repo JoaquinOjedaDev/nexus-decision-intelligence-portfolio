@@ -2,9 +2,14 @@
 
 NEXUS is a local supply chain application for replenishment planning. It forecasts demand and recommends order quantities within budget, supplier, and storage constraints.
 
-- Validates synthetic inputs and builds point-in-time tables with dbt and DuckDB.
-- Generates 14-day demand forecasts and compares plans under normal demand, demand surge, and supplier delay.
-- Requires independent human approval and records mock orders, retries, and simulated outcomes in an audit trail.
+## Analysis guide
+
+Pick one SKU and location, then follow its recommendation through four checks.
+
+1. **Trace the inputs.** Follow the synthetic records through validation, quarantine, and point-in-time dbt tables in DuckDB. Check what data was available at the forecast cutoff. [Data lifecycle](docs/architecture/data-lifecycle.md)
+2. **Read the forecast.** Inspect the 14-day demand range, then review the separate model comparison that kept the seasonal baseline. [Case study](docs/portfolio/CASE_STUDY.md)
+3. **Assess the plan.** Compare costs and service levels under normal demand, demand surge, and supplier delay. Check pack sizes, capacity, and budget against the independent feasibility result. [Planning formulation](docs/decisioning/r4a-mathematical-formulation.md)
+4. **Verify execution controls.** Check that an independent approver authorizes the exact recommendation and that a retry returns the same mock order reference. Trace the simulated outcome in the audit trail. [Connected runtime](docs/portfolio/CONNECTED_RUNTIME.md)
 
 ## Run locally
 
@@ -18,4 +23,4 @@ uv run --group portfolio nexus portfolio serve-runtime
 
 Open [localhost:8766](http://127.0.0.1:8766). Run `uv run --group portfolio nexus portfolio verify-runtime` to check the local workflow.
 
-[Architecture](docs/architecture/data-lifecycle.md) · [Case study](docs/portfolio/CASE_STUDY.md) · [Security](SECURITY.md) · [MIT License](LICENSE)
+[Security](SECURITY.md) · [MIT License](LICENSE)
