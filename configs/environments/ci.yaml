@@ -1,0 +1,5 @@
+name: ci
+data: ephemeral_seeded_smoke
+identity_issuer: short_lived_test_issuer
+external_llm_required: false
+persistent_volumes_allowed: false

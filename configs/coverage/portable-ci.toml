@@ -1,0 +1,26 @@
+[run]
+branch = true
+source = ["nexus"]
+omit = [
+  "src/nexus/r2d.py",
+  "src/nexus/r2d_a2a.py",
+  "src/nexus/r2d_a2b.py",
+  "src/nexus/r2d_a2b2.py",
+  "src/nexus/r2d_b2a.py",
+  "src/nexus/r2d_b2c.py",
+  "src/nexus/ingestion/r2d_a2_contracts.py",
+  "src/nexus/r2d_b2b.py",
+  "src/nexus/ingestion/r2d_a2b_contracts.py",
+  "src/nexus/ingestion/r2d_b2_service.py",
+  "src/nexus/ingestion/r2d_service.py",
+  "src/nexus/ingestion/r2d_service_contracts.py",
+  "src/nexus/r3b.py",
+  "src/nexus/modeling/r3b_*.py",
+  "src/nexus/r4a.py",
+  "src/nexus/decisioning/r4a_*.py",
+]
+
+[report]
+show_missing = true
+skip_covered = true
+fail_under = 85

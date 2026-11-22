@@ -1,0 +1,46 @@
+{
+  "classification": "synthetic",
+  "expected_fixture_version": "1.0.0",
+  "cutoffs": {
+    "early_replay": "2026-06-20T00:00:00Z",
+    "final": "2026-06-30T00:00:00Z"
+  },
+  "expected_controls": {
+    "accepted_inventory_adjustments": 5,
+    "deferred_early": 2,
+    "deferred_final": 1,
+    "fulfillment_rows": 112,
+    "gold_products": 5,
+    "opening_inventory_rows": 4,
+    "product_location_rows": 4,
+    "purchase_order_rows": 20,
+    "quarantine_rows": 4,
+    "receipt_rows": 16,
+    "supplier_rows": 2,
+    "superseded_final": 1
+  },
+  "gold_hashes": {
+    "early": {
+      "gold.r2_demand_history": "871467f42ccb5dae2f828daada1fd5d52e73ff10e5a701f9b79aea39422c1fe3",
+      "gold.r2_fulfillment_outcomes": "2cefa7a87cbc8a9b15c2ee6b29136956db1c1966ebc95e1681c9d6f0a69e6659",
+      "gold.r2_inventory_position": "ed6d491f9e55d66115db6c9a301c31a08fe2d444e862be714cefc3652114a100",
+      "gold.r2_open_orders": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "gold.r2_supplier_performance": "aeeaf9dd9a7c0cc63c098fb7a9c0bb5fb3025743c2f0fc09ad9237647c5d0728"
+    },
+    "final": {
+      "gold.r2_demand_history": "416699ec7a75bdab6bc9e4c5d7ff8b5d95d5a6225e102d4bcb3e3505b935379a",
+      "gold.r2_fulfillment_outcomes": "1a0dfd9c52c9c88052483c7c72270249b81b0a354c3ca243c60a6dc3c1ff8717",
+      "gold.r2_inventory_position": "0f43999ef57db66ab185cf813847c7b4b1fcd1e3734a3a583b961aa611bf25bc",
+      "gold.r2_open_orders": "3c2905b27bba7f1d20d30a7c832a057f0a64522f7bbd092e5b3d4ea8569845de",
+      "gold.r2_supplier_performance": "0989787e4b389fd78b581ef112d5c26af804973f49adc179fd8a9cac1f691219"
+    }
+  },
+  "network_totals_final": {
+    "demand_qty": 1112,
+    "on_hand_qty": 178,
+    "on_order_qty": 240
+  },
+  "seed": 20260718,
+  "source_manifest_file_sha256": "aa25517d49cb6c36b76e9b6a218a83e7419359f5a7c40626412797ca13f8d768",
+  "source_manifest_sha256": "03e32a3f197839134e44b8f6d384787a99ec22e2c088ee4edea8d8322814346b"
+}

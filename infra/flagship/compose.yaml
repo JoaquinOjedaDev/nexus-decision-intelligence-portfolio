@@ -1,0 +1,176 @@
+# Isolated local ops candidate. No public ingress or automatic bootstrap/migration.
+name: nexus-flagship-ops-20260925
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda@sha256:8cb52078690728e2b3d1507fc84eda4c07d4d59bd8fa241e9b1cc7eb7de096c9
+    pull_policy: never
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=768M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=127.0.0.1:19092
+      - --advertise-kafka-addr=127.0.0.1:19092
+    networks: [private]
+    volumes:
+      - broker:/var/lib/redpanda/data
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    healthcheck:
+      test: [CMD, rpk, cluster, health, --exit-when-healthy, -X, brokers=127.0.0.1:19092]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+    labels:
+      nexus.purpose: isolated-full-service-candidate
+
+  postgres:
+    image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+    pull_policy: never
+    network_mode: service:redpanda
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    command: [postgres, -p, '55439', -c, listen_addresses=127.0.0.1]
+    environment:
+      PGDATA: /var/lib/postgresql/data/cluster-v1
+      POSTGRES_USER: nexus_bootstrap
+      POSTGRES_DB: nexus_portfolio_test_ops
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_bootstrap
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256 --auth-local=scram-sha-256
+    secrets: [postgres_bootstrap]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, pg_isready, -h, '127.0.0.1', -p, '55439', -U, nexus_bootstrap, -d, nexus_portfolio_test_ops]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+    labels:
+      nexus.purpose: isolated-full-service-candidate
+
+  initialize-state:
+    image: ${NEXUS_OPS_IMAGE:?Set the locally verified immutable image ID}
+    pull_policy: never
+    profiles: [bootstrap]
+    network_mode: none
+    user: '0:0'
+    entrypoint: [python, -c]
+    command:
+      - |
+        import os
+        from pathlib import Path
+        roots = [Path('/state'), Path('/bootstrap-private')]
+        if any(p.is_symlink() or not p.is_dir() or any(p.iterdir()) for p in roots):
+            raise SystemExit('Fresh empty state volumes required')
+        for p in roots:
+            os.chown(p, 10001, 10001)
+            os.chmod(p, 0o700)
+        print('fresh_volume_ownership_prepared')
+    volumes:
+      - state:/state
+      - bootstrap-private:/bootstrap-private
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 32
+
+  bootstrap:
+    image: ${NEXUS_OPS_IMAGE:?Set the locally verified immutable image ID}
+    pull_policy: never
+    profiles: [bootstrap]
+    network_mode: service:redpanda
+    depends_on:
+      postgres:
+        condition: service_healthy
+      initialize-state:
+        condition: service_completed_successfully
+    entrypoint: [python, /app/scripts/bootstrap_ops_service.py]
+    command:
+      - --expected-cluster-id
+      - ${NEXUS_OPS_CLUSTER_ID:-unselected}
+      - --expected-pgdata
+      - /var/lib/postgresql/data/cluster-v1
+    secrets: [postgres_bootstrap]
+    volumes:
+      - state:/state
+      - bootstrap-private:/bootstrap-private
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=268435456']
+    mem_limit: 1536m
+    cpus: 2
+    pids_limit: 256
+
+  api:
+    image: ${NEXUS_OPS_IMAGE:?Set the locally verified immutable image ID}
+    pull_policy: never
+    profiles: [runtime]
+    network_mode: service:redpanda
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [portfolio, service, serve, /state/private-service.json, --port, '8767']
+    volumes:
+      - state:/state
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=134217728']
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 128
+    stop_grace_period: 30s
+
+  workers:
+    image: ${NEXUS_OPS_IMAGE:?Set the locally verified immutable image ID}
+    pull_policy: never
+    profiles: [runtime]
+    network_mode: service:redpanda
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [portfolio, service, supervise, /state/private-service.json, --duration, '15000', --interval, '3']
+    volumes:
+      - state:/state
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=268435456']
+    mem_limit: 1536m
+    cpus: 2
+    pids_limit: 512
+    stop_grace_period: 60s
+
+networks:
+  private:
+    internal: true
+volumes:
+  broker:
+    labels:
+      nexus.purpose: isolated-full-service-candidate
+  postgres:
+    labels:
+      nexus.purpose: isolated-full-service-candidate
+  state:
+    labels:
+      nexus.purpose: isolated-full-service-candidate
+  bootstrap-private:
+    labels:
+      nexus.purpose: isolated-full-service-bootstrap-private
+secrets:
+  postgres_bootstrap:
+    file: ${NEXUS_OPS_PG_SECRET:?Supply a fresh private bootstrap-password file}

@@ -1,0 +1,8 @@
+{
+  "logical_event_id": "ADJ-CYCLE-001",
+  "revision": 2,
+  "sku_id": "SKU-001",
+  "location_id": "DC-ARG-01",
+  "delta_qty": -3,
+  "reason_code": "synthetic_reconciliation"
+}

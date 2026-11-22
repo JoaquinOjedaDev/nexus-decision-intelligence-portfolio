@@ -1,0 +1,27 @@
+release: R2D-A2a
+contract_version: 1.0.0
+
+broker:
+  topic: inventory.adjusted.v1
+  partition_count: 2
+  replication_factor: 1
+  producer_acks: all
+  producer_enable_idempotence: true
+  consumer_group_id: nexus-r2d-a2a-primary-v1
+  consumer_auto_offset_commit: false
+  consumer_auto_offset_store: false
+  isolation_level: read_committed
+
+postgres:
+  schema_name: r2d_capture
+  migration_version: 001_r2d_capture
+  migration_path: infra/postgres/migrations/001_r2d_capture.sql
+  lock_timeout_ms: 5000
+  statement_timeout_ms: 30000
+
+gate:
+  maximum_records: 64
+  service_start_timeout_seconds: 120
+  poll_timeout_seconds: 30
+  shutdown_timeout_seconds: 15
+  require_fresh_empty_topic: true

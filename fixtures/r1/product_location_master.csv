@@ -1,0 +1,2 @@
+sku_id,location_id,lead_time_days,safety_stock_qty,active,available_at
+SKU-001,DC-ARG-01,7,15,true,2026-07-15T06:00:00Z

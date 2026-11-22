@@ -1,0 +1,44 @@
+version: 2
+
+seeds:
+  - name: inventory_adjustments
+    description: Deterministic R0 fixture representing the selected inventory-adjusted event.
+    config:
+      column_types:
+        event_id: varchar
+        sku_id: varchar
+        location_id: varchar
+        delta_qty: bigint
+        reason: varchar
+        event_time: varchar
+        ingested_at: varchar
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: sku_id
+        data_tests: [not_null]
+      - name: location_id
+        data_tests: [not_null]
+      - name: reason
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [opening_balance, sale, receipt, correction]
+
+models:
+  - name: stg_inventory_adjustments
+    description: Typed, point-in-time-safe inventory adjustment events.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: sku_id
+        data_tests: [not_null]
+      - name: location_id
+        data_tests: [not_null]
+      - name: delta_qty
+        data_tests: [not_null]
+      - name: event_time
+        data_tests: [not_null]
+      - name: ingested_at
+        data_tests: [not_null]

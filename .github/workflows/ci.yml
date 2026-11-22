@@ -1,0 +1,1018 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      validation_tier:
+        description: Validation depth; full runs every cross-platform and live-service gate
+        required: true
+        default: lean
+        type: choice
+        options:
+          - lean
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NEXUS_PORTFOLIO_PG_TEST_CONFIG: ${{ github.workspace }}/artifacts/ci-postgres/connection-secrets.json
+      DBT_SEND_ANONYMOUS_USAGE_STATS: 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Sync locked dependencies
+        run: uv sync --locked --no-default-groups --group portfolio --group orchestration --group modeling --group r2d-service --group dev
+      - name: Build repository package integrity artifact
+        run: uv build
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Mypy
+        run: uv run mypy
+      - name: Install native PostgreSQL test binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-16
+      - name: Initialize isolated portfolio test cluster
+        run: >-
+          uv run python scripts/native_postgres_test_cluster.py init
+          --root artifacts/ci-postgres --bin-dir /usr/lib/postgresql/16/bin --port 55438
+      - name: Tests
+        run: >-
+          uv run python -m pytest
+          -m "not r2d_acceptance and not r2d_integration and not r2d_service and not r3b and not r4a"
+          --cov=nexus --cov-config=configs/coverage/portable-ci.toml
+          --cov-report=term-missing --cov-report=xml
+      - name: R0 executable gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+        run: uv run nexus r0 verify --with-compose
+      - name: Portfolio closed-loop acceptance
+        if: matrix.python-version == '3.13'
+        run: uv run --group portfolio nexus portfolio verify
+      - name: Stop isolated portfolio test cluster
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -f artifacts/ci-postgres/connection-secrets.json && -f artifacts/ci-postgres/data/postmaster.pid ]]; then
+            uv run python scripts/native_postgres_test_cluster.py stop --root artifacts/ci-postgres
+          else
+            echo 'No task-cluster process recorded; no stop attempted.'
+          fi
+      - name: R1 executable gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+        run: uv run nexus r1 verify
+      - name: R2A trustworthy-data gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+        run: uv run nexus r2 verify
+      - name: R2B partition-materialization gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' && matrix.python-version == '3.13' }}
+        run: uv run nexus r2b verify
+        timeout-minutes: 6
+      - name: R2C representative-profile gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' && matrix.python-version == '3.13' }}
+        run: uv run nexus r2c verify
+        timeout-minutes: 3
+      - name: R3A probabilistic-baseline gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+        run: uv run nexus r3 verify
+
+  windows-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked --no-default-groups --group portfolio --group orchestration --group dev
+      - run: uv run nexus doctor
+      - run: >-
+          uv run python -m pytest -q
+          -m "not r2d_acceptance and not r2d_integration and not r2d_service and not r3b and not r4a"
+      - run: uv run nexus r1 verify
+      - run: uv run nexus r2 verify
+      - name: R2B partition-materialization gate
+        run: uv run nexus r2b verify
+        timeout-minutes: 6
+      - name: R2C representative-profile gate
+        run: uv run nexus r2c verify
+        timeout-minutes: 3
+      - run: uv run nexus r3 verify
+
+  r2d-core:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-core-${{ matrix.os }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            full_gate: false
+            semantics_integration: false
+            bundle_name: none
+          - os: ubuntu-latest
+            python-version: "3.13"
+            full_gate: true
+            semantics_integration: true
+            bundle_name: r2d-a1-portable-bundle-linux-py313
+          - os: windows-latest
+            python-version: "3.13"
+            full_gate: true
+            semantics_integration: false
+            bundle_name: r2d-a1-portable-bundle-windows-py313
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Sync portable R2D-A1 dependencies
+        run: uv sync --locked --no-default-groups --group data --group orchestration --group dev
+      - name: R2D-A1 portable unit and contract tests
+        run: >-
+          uv run python -m pytest -q -o "python_files=test_r2d_*.py"
+          -m "not r2d_acceptance and not r2d_integration and not r2d_service"
+      - name: R2D-A1 semantic integration
+        if: matrix.semantics_integration
+        run: uv run python -m pytest -q tests/test_r2d_semantics.py -m r2d_integration
+        timeout-minutes: 8
+      - name: R2D-A1 complete acceptance and portable gate
+        if: matrix.full_gate
+        env:
+          R2D_A1_ACCEPTANCE_ARTIFACT_ROOT: artifacts/r2d/a1-verification
+        run: uv run python -m pytest -q tests/test_r2d_acceptance.py
+        timeout-minutes: 8
+      - name: Upload complete R2D-A1 portable bundle
+        if: matrix.full_gate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.bundle_name }}
+          path: artifacts/r2d/a1-verification
+          if-no-files-found: error
+          retention-days: 14
+
+  r2d-core-cross-platform-receipt:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-core-cross-platform-receipt
+    needs: r2d-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync portable R2D-A1 comparator dependencies
+        run: uv sync --locked --no-default-groups --group data --group orchestration
+      - name: Download Linux portable bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r2d-a1-portable-bundle-linux-py313
+          path: artifacts/r2d/bundles/linux
+      - name: Download Windows portable bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r2d-a1-portable-bundle-windows-py313
+          path: artifacts/r2d/bundles/windows
+      - name: Rehash and compare portable event-path bundles
+        run: >-
+          uv run nexus r2d compare-platforms
+          --left artifacts/r2d/bundles/linux/r2d-a1-verification-receipt.json
+          --right artifacts/r2d/bundles/windows/r2d-a1-verification-receipt.json
+
+  r2d-b1-core:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-b1-core-${{ matrix.os }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            full_gate: false
+            bundle_name: none
+          - os: ubuntu-latest
+            python-version: "3.13"
+            full_gate: true
+            bundle_name: r2d-b1-portable-bundle-linux-py313
+          - os: windows-latest
+            python-version: "3.13"
+            full_gate: true
+            bundle_name: r2d-b1-portable-bundle-windows-py313
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Sync portable R2D-B1 dependencies
+        run: uv sync --locked --no-default-groups --group data --group orchestration --group dev
+      - name: R2D-B1 contract, receipt, CLI, and tamper tests
+        run: uv run python -m pytest -q tests/test_r2d_b1_contracts.py tests/test_r2d_b1_gate.py
+      - name: R2D-B1 two-replay portable gate
+        if: matrix.full_gate
+        run: >-
+          uv run nexus r2d verify-b1
+          --artifact-dir artifacts/r2d/b1-verification
+        timeout-minutes: 3
+      - name: Upload complete R2D-B1 portable bundle
+        if: matrix.full_gate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.bundle_name }}
+          path: artifacts/r2d/b1-verification
+          if-no-files-found: error
+          retention-days: 14
+
+  r2d-b1-cross-platform-receipt:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-b1-cross-platform-receipt
+    needs: r2d-b1-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync portable R2D-B1 comparator dependencies
+        run: uv sync --locked --no-default-groups --group data --group orchestration
+      - name: Download Linux B1 portable bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r2d-b1-portable-bundle-linux-py313
+          path: artifacts/r2d/b1-bundles/linux
+      - name: Download Windows B1 portable bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r2d-b1-portable-bundle-windows-py313
+          path: artifacts/r2d/b1-bundles/windows
+      - name: Rehash and compare complete R2D-B1 bundles
+        run: >-
+          uv run nexus r2d compare-b1-platforms
+          --left artifacts/r2d/b1-bundles/linux/r2d/b1/verification_receipt/*.json
+          --right artifacts/r2d/b1-bundles/windows/r2d/b1/verification_receipt/*.json
+
+  r2d-service-b2a:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-b2a-live-dlq-linux-py3.13
+    needs: r2d-b1-cross-platform-receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-b2a-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_R2D_B2_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated R2D-B2a dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh Redpanda
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 redpanda
+      - name: Record canonical observed Redpanda image identity
+        shell: bash
+        run: |
+          mkdir -p artifacts/r2d
+          CONTAINER="${COMPOSE_PROJECT_NAME}-redpanda-1"
+          REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${CONTAINER}")"
+          IMAGE_ID="$(docker inspect --format='{{.Image}}' "${CONTAINER}")"
+          IMAGE_OS="$(docker image inspect --format='{{.Os}}' "${IMAGE_ID}")"
+          IMAGE_ARCH="$(docker image inspect --format='{{.Architecture}}' "${IMAGE_ID}")"
+          IMAGE_PAYLOAD="$(
+            jq -cnS \
+              --arg configured_reference "${REFERENCE}" \
+              --arg observed_image_id "${IMAGE_ID}" \
+              --arg operating_system "${IMAGE_OS}" \
+              --arg architecture "${IMAGE_ARCH}" \
+              '{architecture:$architecture,configured_reference:$configured_reference,contract_version:"r2d.b2a.service-image.v1",observed_image_id:$observed_image_id,operating_system:$operating_system,service:"redpanda"}'
+          )"
+          CONTENT_SHA256="$(printf '%s' "${IMAGE_PAYLOAD}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s' "${IMAGE_PAYLOAD}" | \
+            jq -cS --arg content_sha256 "${CONTENT_SHA256}" \
+              '. + {content_sha256:$content_sha256}' \
+              > artifacts/r2d/b2a-service-image.json
+      - name: R2D-B2a strict contracts, receipt, tamper, and CLI tests
+        run: uv run python -m pytest -q tests/test_r2d_b2_contracts.py
+      - name: R2D-B2a strict type checks with Kafka client
+        run: >-
+          uv run mypy src/nexus/r2d_b2a.py
+          src/nexus/ingestion/r2d_b2_contracts.py
+          src/nexus/ingestion/r2d_b2_service.py
+      - name: R2D-B2a live dead-letter and manual-redrive gate
+        run: >-
+          uv run nexus r2d verify-service-b2a
+          --service-image-evidence artifacts/r2d/b2a-service-image.json
+          --artifact-dir artifacts/r2d/b2a-ci
+      - name: Upload complete R2D-B2a service evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-b2a-live-dlq-evidence-linux-py313
+          path: |
+            artifacts/r2d/b2a-ci
+            artifacts/r2d/b2a-service-image.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show Redpanda logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color redpanda
+      - name: Teardown isolated service and volume
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers
+        if: always()
+        run: >-
+          test -z "$(docker ps -aq
+          --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+
+
+  r2d-service-b2b:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-b2b-persistent-dagster-linux-py3.13
+    needs: r2d-service-b2a
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-b2b-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_POSTGRES_PORT: 55436
+      NEXUS_R2D_B2B_POSTGRES_DSN: postgresql://nexus:local-only-change-me@127.0.0.1:55436/nexus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated persistent Dagster dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh PostgreSQL
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 postgres
+      - name: Record canonical observed PostgreSQL image identity
+        shell: bash
+        run: |
+          mkdir -p artifacts/r2d
+          CONTAINER="${COMPOSE_PROJECT_NAME}-postgres-1"
+          REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${CONTAINER}")"
+          IMAGE_ID="$(docker inspect --format='{{.Image}}' "${CONTAINER}")"
+          IMAGE_OS="$(docker image inspect --format='{{.Os}}' "${IMAGE_ID}")"
+          IMAGE_ARCH="$(docker image inspect --format='{{.Architecture}}' "${IMAGE_ID}")"
+          IMAGE_PAYLOAD="$(
+            jq -cnS \
+              --arg configured_reference "${REFERENCE}" \
+              --arg observed_image_id "${IMAGE_ID}" \
+              --arg operating_system "${IMAGE_OS}" \
+              --arg architecture "${IMAGE_ARCH}" \
+              '{architecture:$architecture,configured_reference:$configured_reference,contract_version:"r2d.b2b.service-image.v1",observed_image_id:$observed_image_id,operating_system:$operating_system,service:"postgres"}'
+          )"
+          CONTENT_SHA256="$(printf '%s' "${IMAGE_PAYLOAD}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s' "${IMAGE_PAYLOAD}" | \
+            jq -cS --arg content_sha256 "${CONTENT_SHA256}" \
+              '. + {content_sha256:$content_sha256}' \
+              > artifacts/r2d/b2b-service-image.json
+      - name: R2D-B2b contracts, receipt, tamper, CLI, and topology tests
+        run: uv run python -m pytest -q tests/test_r2d_b2b_contracts.py
+      - name: R2D-B2b strict type checks
+        run: >-
+          uv run mypy src/nexus/r2d_b2b.py
+          src/nexus/orchestration/r2d_b2b_contracts.py
+          src/nexus/orchestration/r2d_b2b_definitions.py
+      - name: R2D-B2b live persistent backfill and daemon-restart gate
+        run: >-
+          uv run nexus r2d verify-service-b2b
+          --service-image-evidence artifacts/r2d/b2b-service-image.json
+          --artifact-dir artifacts/r2d/b2b-ci
+      - name: Upload complete R2D-B2b evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-b2b-persistent-dagster-evidence-linux-py313
+          path: |
+            artifacts/r2d/b2b-ci
+            artifacts/r2d/b2b-service-image.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show PostgreSQL logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color postgres
+      - name: Teardown isolated service and volume
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers
+        if: always()
+        run: >-
+          test -z "$(docker ps -aq
+          --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+
+  r2d-service-b2c:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-b2c-retained-restart-linux-py3.13
+    needs: r2d-service-b2b
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-b2c-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_POSTGRES_PORT: 55437
+      NEXUS_R2D_B2_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+      NEXUS_R2D_B2B_POSTGRES_DSN: postgresql://nexus:local-only-change-me@127.0.0.1:55437/nexus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated retained-restart dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh retained-volume services
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 redpanda postgres
+      - name: Record canonical observed service image identities
+        shell: bash
+        run: |
+          mkdir -p artifacts/r2d/b2c-inputs
+          REDPANDA_CONTAINER="${COMPOSE_PROJECT_NAME}-redpanda-1"
+          REDPANDA_REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${REDPANDA_CONTAINER}")"
+          REDPANDA_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${REDPANDA_CONTAINER}")"
+          REDPANDA_OS="$(docker image inspect --format='{{.Os}}' "${REDPANDA_IMAGE_ID}")"
+          REDPANDA_ARCH="$(docker image inspect --format='{{.Architecture}}' "${REDPANDA_IMAGE_ID}")"
+          REDPANDA_PAYLOAD="$(
+            jq -cnS \
+              --arg configured_reference "${REDPANDA_REFERENCE}" \
+              --arg observed_image_id "${REDPANDA_IMAGE_ID}" \
+              --arg operating_system "${REDPANDA_OS}" \
+              --arg architecture "${REDPANDA_ARCH}" \
+              '{architecture:$architecture,configured_reference:$configured_reference,contract_version:"r2d.b2a.service-image.v1",observed_image_id:$observed_image_id,operating_system:$operating_system,service:"redpanda"}'
+          )"
+          REDPANDA_SHA="$(printf '%s' "${REDPANDA_PAYLOAD}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s' "${REDPANDA_PAYLOAD}" | \
+            jq -cS --arg content_sha256 "${REDPANDA_SHA}" \
+              '. + {content_sha256:$content_sha256}' \
+              > artifacts/r2d/b2c-inputs/b2a-service-image.json
+          POSTGRES_CONTAINER="${COMPOSE_PROJECT_NAME}-postgres-1"
+          POSTGRES_REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${POSTGRES_CONTAINER}")"
+          POSTGRES_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${POSTGRES_CONTAINER}")"
+          POSTGRES_OS="$(docker image inspect --format='{{.Os}}' "${POSTGRES_IMAGE_ID}")"
+          POSTGRES_ARCH="$(docker image inspect --format='{{.Architecture}}' "${POSTGRES_IMAGE_ID}")"
+          POSTGRES_PAYLOAD="$(
+            jq -cnS \
+              --arg configured_reference "${POSTGRES_REFERENCE}" \
+              --arg observed_image_id "${POSTGRES_IMAGE_ID}" \
+              --arg operating_system "${POSTGRES_OS}" \
+              --arg architecture "${POSTGRES_ARCH}" \
+              '{architecture:$architecture,configured_reference:$configured_reference,contract_version:"r2d.b2b.service-image.v1",observed_image_id:$observed_image_id,operating_system:$operating_system,service:"postgres"}'
+          )"
+          POSTGRES_SHA="$(printf '%s' "${POSTGRES_PAYLOAD}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s' "${POSTGRES_PAYLOAD}" | \
+            jq -cS --arg content_sha256 "${POSTGRES_SHA}" \
+              '. + {content_sha256:$content_sha256}' \
+              > artifacts/r2d/b2c-inputs/b2b-service-image.json
+      - name: R2D-B2c contracts, lifecycle, tamper, CLI, and topology tests
+        run: uv run python -m pytest -q tests/test_r2d_b2c_contracts.py
+      - name: R2D-B2c strict type checks
+        run: >-
+          uv run mypy src/nexus/r2d_b2c.py
+          src/nexus/orchestration/r2d_b2c_contracts.py
+      - name: Build current B2a authority in the retained project
+        run: >-
+          uv run nexus r2d verify-service-b2a
+          --service-image-evidence artifacts/r2d/b2c-inputs/b2a-service-image.json
+          --artifact-dir artifacts/r2d/b2c-inputs/b2a
+      - name: Build current B2b authority in the retained project
+        run: >-
+          uv run nexus r2d verify-service-b2b
+          --service-image-evidence artifacts/r2d/b2c-inputs/b2b-service-image.json
+          --artifact-dir artifacts/r2d/b2c-inputs/b2b
+      - name: Capture exact pre-restart checkpoint
+        shell: bash
+        run: |
+          B2A_RECEIPT="$(find artifacts/r2d/b2c-inputs/b2a/r2d/b2a/verification_receipt -name '*.json' -type f)"
+          B2B_RECEIPT="$(find artifacts/r2d/b2c-inputs/b2b/r2d/b2b/verification_receipt -name '*.json' -type f)"
+          uv run nexus r2d capture-service-b2c-before \
+            --dagster-home artifacts/r2d/b2c-inputs/b2b/dagster-home \
+            --b2a-receipt "${B2A_RECEIPT}" \
+            --b2b-receipt "${B2B_RECEIPT}" \
+            --output artifacts/r2d/b2c-inputs/pre-restart-checkpoint.json
+      - name: Stop and restart both services with retained volumes
+        run: >-
+          uv run nexus r2d cycle-service-b2c
+          --output artifacts/r2d/b2c-inputs/service-lifecycle.json
+      - name: Verify retained state and fresh reconnect I/O
+        shell: bash
+        run: |
+          B2A_RECEIPT="$(find artifacts/r2d/b2c-inputs/b2a/r2d/b2a/verification_receipt -name '*.json' -type f)"
+          B2B_RECEIPT="$(find artifacts/r2d/b2c-inputs/b2b/r2d/b2b/verification_receipt -name '*.json' -type f)"
+          uv run nexus r2d verify-service-b2c \
+            --dagster-home artifacts/r2d/b2c-inputs/b2b/dagster-home \
+            --b2a-receipt "${B2A_RECEIPT}" \
+            --b2b-receipt "${B2B_RECEIPT}" \
+            --pre-restart-checkpoint artifacts/r2d/b2c-inputs/pre-restart-checkpoint.json \
+            --lifecycle-evidence artifacts/r2d/b2c-inputs/service-lifecycle.json \
+            --artifact-dir artifacts/r2d/b2c-ci
+      - name: Offline-reload complete B2c package
+        shell: bash
+        run: |
+          B2C_RECEIPT="$(find artifacts/r2d/b2c-ci/r2d/b2c/verification_receipt -name '*.json' -type f)"
+          uv run python -c 'import sys; from pathlib import Path; from nexus.r2d_b2c import load_r2d_b2c_receipt; receipt=load_r2d_b2c_receipt(Path(sys.argv[1])); print(receipt.content_sha256)' "${B2C_RECEIPT}"
+      - name: Upload complete R2D-B2c retained-restart evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-b2c-retained-restart-evidence-linux-py313
+          path: |
+            artifacts/r2d/b2c-ci
+            artifacts/r2d/b2c-inputs/pre-restart-checkpoint.json
+            artifacts/r2d/b2c-inputs/service-lifecycle.json
+            artifacts/r2d/b2c-inputs/b2a-service-image.json
+            artifacts/r2d/b2c-inputs/b2b-service-image.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show retained-service logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color
+      - name: Teardown isolated services and retained volumes
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers and volumes
+        if: always()
+        shell: bash
+        run: |
+          test -z "$(docker ps -aq --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+          test -z "$(docker volume ls -q --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+
+  r2d-service-a2a:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-a2a-linux-py3.13
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-a2a-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_R2D_A2_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+      NEXUS_R2D_A2_POSTGRES_DSN: postgresql://nexus:local-only-change-me@127.0.0.1:55432/nexus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated R2D-A2a dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh Redpanda and PostgreSQL
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 postgres redpanda
+      - name: Record resolved service images
+        run: |
+          mkdir -p artifacts/r2d
+          docker inspect --format='{{.Name}} {{.Image}}' \
+            "${COMPOSE_PROJECT_NAME}-redpanda-1" \
+            "${COMPOSE_PROJECT_NAME}-postgres-1" \
+            > artifacts/r2d/a2a-service-images.txt
+      - name: R2D-A2a contract and migration tests
+        run: uv run python -m pytest -q tests/test_r2d_service_contracts.py
+      - name: R2D-A2a strict type checks with service clients
+        run: >-
+          uv run mypy src/nexus/r2d_a2a.py
+          src/nexus/ingestion/r2d_service.py
+          src/nexus/ingestion/r2d_service_contracts.py
+
+      - name: R2D-A2a real service-foundation gate
+        run: >-
+          uv run nexus r2d verify-service-a2a
+          --artifact-dir artifacts/r2d/a2a-ci
+      - name: Upload R2D-A2a service receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-a2a-service-receipt-linux-py313
+          path: |
+            artifacts/r2d/a2a-ci
+            artifacts/r2d/a2a-service-images.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color
+      - name: Teardown isolated services and volumes
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers
+        if: always()
+        run: >-
+          test -z "$(docker ps -aq
+          --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+
+  r2d-service-a2b1:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-a2b1-linux-py3.13
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-a2b1-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_R2D_A2_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+      NEXUS_R2D_A2_POSTGRES_DSN: postgresql://nexus:local-only-change-me@127.0.0.1:55432/nexus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated R2D-A2b-1 dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh Redpanda and PostgreSQL
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 postgres redpanda
+      - name: Record resolved service images
+        run: |
+          mkdir -p artifacts/r2d
+          docker inspect --format='{{.Name}} {{.Image}}' \
+            "${COMPOSE_PROJECT_NAME}-redpanda-1" \
+            "${COMPOSE_PROJECT_NAME}-postgres-1" \
+            > artifacts/r2d/a2b1-service-images.txt
+      - name: R2D-A2b-1 strict contracts and tamper tests
+        run: uv run python -m pytest -q tests/test_r2d_a2b_contracts.py
+      - name: R2D-A2b-1 strict type checks with service clients
+        run: >-
+          uv run mypy src/nexus/r2d_a2b.py
+          src/nexus/ingestion/r2d_a2b_contracts.py
+          src/nexus/ingestion/r2d_service.py
+      - name: R2D-A2b-1 real crash-recovery gate
+        run: >-
+          uv run nexus r2d verify-service-a2b1
+          --artifact-dir artifacts/r2d/a2b1-ci
+      - name: Upload R2D-A2b-1 crash-recovery receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-a2b1-service-receipt-linux-py313
+          path: |
+            artifacts/r2d/a2b1-ci
+            artifacts/r2d/a2b1-service-images.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color
+      - name: Teardown isolated services and volumes
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers
+        if: always()
+        run: >-
+          test -z "$(docker ps -aq
+          --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+
+
+  r2d-service-a2b2:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r2d-service-a2b2-linux-py3.13
+    needs: r2d-service-a2b1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: nexus-r2d-a2b2-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_R2D_A2_BOOTSTRAP_SERVERS: 127.0.0.1:9092
+      NEXUS_R2D_A2_POSTGRES_DSN: postgresql://nexus:local-only-change-me@127.0.0.1:55432/nexus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Download same-commit A2b-1 crash receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r2d-a2b1-service-receipt-linux-py313
+          path: artifacts/r2d/a2b1-evidence
+      - name: Sync isolated R2D-A2b-2 dependencies
+        run: >-
+          uv sync --locked --no-default-groups
+          --group data --group orchestration --group r2d-service --group dev
+      - name: Validate isolated service topology
+        run: docker compose -f infra/compose.yaml --profile ops config --quiet
+      - name: Start fresh Redpanda and PostgreSQL
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          up -d --wait --wait-timeout 120 postgres redpanda
+      - name: Record canonical resolved service images
+        shell: bash
+        run: |
+          mkdir -p artifacts/r2d
+          POSTGRES_CONTAINER="${COMPOSE_PROJECT_NAME}-postgres-1"
+          REDPANDA_CONTAINER="${COMPOSE_PROJECT_NAME}-redpanda-1"
+          POSTGRES_REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${POSTGRES_CONTAINER}")"
+          REDPANDA_REFERENCE="$(docker inspect --format='{{.Config.Image}}' "${REDPANDA_CONTAINER}")"
+          POSTGRES_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${POSTGRES_CONTAINER}")"
+          REDPANDA_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${REDPANDA_CONTAINER}")"
+          POSTGRES_OS="$(docker image inspect --format='{{.Os}}' "${POSTGRES_IMAGE_ID}")"
+          REDPANDA_OS="$(docker image inspect --format='{{.Os}}' "${REDPANDA_IMAGE_ID}")"
+          POSTGRES_ARCH="$(docker image inspect --format='{{.Architecture}}' "${POSTGRES_IMAGE_ID}")"
+          REDPANDA_ARCH="$(docker image inspect --format='{{.Architecture}}' "${REDPANDA_IMAGE_ID}")"
+          IMAGE_PAYLOAD="$(
+            jq -cnS \
+              --arg postgres_reference "${POSTGRES_REFERENCE}" \
+              --arg postgres_image_id "${POSTGRES_IMAGE_ID}" \
+              --arg postgres_os "${POSTGRES_OS}" \
+              --arg postgres_arch "${POSTGRES_ARCH}" \
+              --arg redpanda_reference "${REDPANDA_REFERENCE}" \
+              --arg redpanda_image_id "${REDPANDA_IMAGE_ID}" \
+              --arg redpanda_os "${REDPANDA_OS}" \
+              --arg redpanda_arch "${REDPANDA_ARCH}" \
+              '{contract_version:"r2d.a2.service-images.v1",images:[{architecture:$postgres_arch,configured_reference:$postgres_reference,observed_image_id:$postgres_image_id,operating_system:$postgres_os,service:"postgres"},{architecture:$redpanda_arch,configured_reference:$redpanda_reference,observed_image_id:$redpanda_image_id,operating_system:$redpanda_os,service:"redpanda"}]}'
+          )"
+          IMAGE_CONTENT_SHA256="$(printf '%s' "${IMAGE_PAYLOAD}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s' "${IMAGE_PAYLOAD}" | \
+            jq -cS --arg content_sha256 "${IMAGE_CONTENT_SHA256}" \
+              '. + {content_sha256:$content_sha256}' \
+              > artifacts/r2d/a2b2-service-images.json
+      - name: R2D-A2 final contracts and tamper tests
+        run: uv run python -m pytest -q tests/test_r2d_a2_contracts.py
+      - name: R2D-A2 strict type checks with service and R2A
+        run: >-
+          uv run mypy src/nexus/r2d_a2b2.py
+          src/nexus/ingestion/r2d_a2_contracts.py
+          src/nexus/ingestion/r2d_service.py
+      - name: R2D-A2 retained-state rebuild and semantic parity gate
+        run: |
+          A2B1_RECEIPT="$(find artifacts/r2d/a2b1-evidence -type f -path '*r2d/a2b1/verification_receipt/*.json' | head -n 1)"
+          test -n "${A2B1_RECEIPT}"
+          uv run nexus r2d verify-service-a2b2 \
+            --a2b1-receipt "${A2B1_RECEIPT}" \
+            --service-image-evidence artifacts/r2d/a2b2-service-images.json \
+            --artifact-dir artifacts/r2d/a2-ci
+      - name: Upload final R2D-A2 evidence package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: r2d-a2-final-evidence-linux-py313
+          path: |
+            artifacts/r2d/a2-ci
+            artifacts/r2d/a2b2-service-images.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile ops logs --no-color
+      - name: Teardown isolated services and volumes
+        if: always()
+        run: >-
+          docker compose -f infra/compose.yaml --profile ops
+          down -v --remove-orphans
+      - name: Audit zero surviving project containers
+        if: always()
+        run: >-
+          test -z "$(docker ps -aq
+          --filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME})"
+  r3b-learned-intelligence:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r3b-${{ matrix.os }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            full_gate: false
+            receipt_name: none
+          - os: ubuntu-latest
+            python-version: "3.13"
+            full_gate: true
+            receipt_name: r3b-receipt-linux-py313
+          - os: windows-latest
+            python-version: "3.13"
+            full_gate: true
+            receipt_name: r3b-receipt-windows-py313
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Sync isolated R3B dependencies
+        run: uv sync --locked --no-default-groups --group r3b --group dev
+      - name: R3B unit tests
+        run: uv run python -m pytest -q -o "python_files=test_r3b_*.py" --ignore=tests/test_r3b_acceptance.py
+      - name: R3B complete acceptance and learned-intelligence gate
+        if: matrix.full_gate
+        env:
+          R3B_ACCEPTANCE_ARTIFACT_ROOT: artifacts/r3b/ci
+        run: uv run python -m pytest -q tests/test_r3b_acceptance.py
+        timeout-minutes: 6
+      - name: Upload normalized R3B receipt
+        if: matrix.full_gate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.receipt_name }}
+          path: artifacts/r3b/ci/r3b-platform-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  r3b-cross-platform-receipt:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r3b-cross-platform-receipt
+    needs: r3b-learned-intelligence
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync R3B comparator dependencies
+        run: uv sync --locked --no-default-groups --group r3b
+      - name: Download Linux receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r3b-receipt-linux-py313
+          path: artifacts/r3b/receipts/linux
+      - name: Download Windows receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r3b-receipt-windows-py313
+          path: artifacts/r3b/receipts/windows
+      - name: Compare normalized scientific evidence
+        run: >-
+          uv run nexus r3b compare-platforms
+          --left artifacts/r3b/receipts/linux/r3b-platform-receipt.json
+          --right artifacts/r3b/receipts/windows/r3b-platform-receipt.json
+
+  r4a-constrained-decisioning:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r4a-${{ matrix.os }}-py3.13
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            receipt_name: r4a-receipt-linux-py313
+          - os: windows-latest
+            receipt_name: r4a-receipt-windows-py313
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync isolated R4A dependencies
+        run: uv sync --locked --no-default-groups --group r4a --group dev
+      - name: R4A unit and contract tests
+        run: >-
+          uv run python -m pytest -q
+          tests/test_r4a_contracts.py
+          tests/test_r4a_scenarios.py
+          tests/test_r4a_optimizer.py
+          tests/test_r4a_evaluation.py
+          tests/test_r4a_acceptance.py
+          tests/test_r4a_cli.py
+      - name: R4A two-replay constrained-decisioning gate
+        run: uv run nexus r4a verify --artifact-dir artifacts/r4a/ci
+        timeout-minutes: 6
+      - name: Upload normalized R4A receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.receipt_name }}
+          path: artifacts/r4a/ci/r4a/verification/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  r4a-cross-platform-receipt:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_tier == 'full' }}
+    name: r4a-cross-platform-receipt
+    needs: r4a-constrained-decisioning
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.29"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sync R4A comparator dependencies
+        run: uv sync --locked --no-default-groups --group r4a
+      - name: Download Linux receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r4a-receipt-linux-py313
+          path: artifacts/r4a/receipts/linux
+      - name: Download Windows receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: r4a-receipt-windows-py313
+          path: artifacts/r4a/receipts/windows
+      - name: Compare normalized decision evidence
+        run: >-
+          uv run nexus r4a compare-platforms
+          --left artifacts/r4a/receipts/linux/*.json
+          --right artifacts/r4a/receipts/windows/*.json

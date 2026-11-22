@@ -1,0 +1,41 @@
+{
+  "adaptation": "rounded_q10_q50_q90_repeated_to_14_daily_marginals",
+  "challenger_gate_status": "CHALLENGER_LOST",
+  "contract_version": "r4a.champion-forecast-adapter.v1",
+  "joint_distribution_calibration_claimed": false,
+  "lines": [
+    {
+      "daily_median_demand": [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+      "daily_q10_demand": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+      "daily_q90_demand": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+      "location_id": "LOC-001",
+      "sku_id": "SKU-00001"
+    },
+    {
+      "daily_median_demand": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+      "daily_q10_demand": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "daily_q90_demand": [21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+      "location_id": "LOC-002",
+      "sku_id": "SKU-00001"
+    },
+    {
+      "daily_median_demand": [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15],
+      "daily_q10_demand": [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+      "daily_q90_demand": [18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18],
+      "location_id": "LOC-002",
+      "sku_id": "SKU-00002"
+    },
+    {
+      "daily_median_demand": [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15],
+      "daily_q10_demand": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+      "daily_q90_demand": [27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27],
+      "location_id": "LOC-001",
+      "sku_id": "SKU-00003"
+    }
+  ],
+  "selected_model": "seasonal_naive_empirical_intervals",
+  "source_contract": "nexus.r3b.persisted-forecast-bundle.v1",
+  "source_forecast_artifact_sha256": "72714ca2b3074d0170e5ccbe113fbb5483fb1717b9aebeca3ddd1315eadcd3da",
+  "source_origin": "2026-02-25T04:00:00Z",
+  "source_promotion_artifact_sha256": "a4bb29a59e30092ee25336c9af3a0edf3d9dac9a67852d9d529ab482a7dbf1ee"
+}

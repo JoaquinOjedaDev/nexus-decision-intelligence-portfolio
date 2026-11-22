@@ -1,0 +1,15 @@
+nexus:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('NEXUS_DBT_PATH', 'artifacts/dbt/nexus_dev.duckdb') }}"
+      threads: 2
+      settings:
+        TimeZone: UTC
+    ci:
+      type: duckdb
+      path: "{{ env_var('NEXUS_DBT_PATH', 'artifacts/dbt/nexus_ci.duckdb') }}"
+      threads: 1
+      settings:
+        TimeZone: UTC

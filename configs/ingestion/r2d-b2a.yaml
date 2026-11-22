@@ -1,0 +1,45 @@
+release: R2D-B2a
+contract_version: 1.0.0
+
+inherited_b1:
+  config_path: configs/ingestion/r2d-b1.yaml
+  config_sha256: 61dacd3ef618138b2e91701c3bc032e91e978065c08bb916429e1a2f18323b3e
+
+broker:
+  source_topic: inventory.adjusted.v1
+  dead_letter_topic: inventory.adjusted.dlq.v1
+  redrive_audit_topic: inventory.adjusted.redrive.v1
+  partition_count: 2
+  replication_factor: 1
+  retention_ms: -1
+  producer_acks: all
+  producer_enable_idempotence: true
+  router_consumer_group_id: nexus-r2d-b2a-router-v1
+  dead_letter_audit_consumer_group_id: nexus-r2d-b2a-dlq-audit-v1
+  redrive_audit_consumer_group_id: nexus-r2d-b2a-redrive-audit-v1
+  consumer_auto_offset_commit: false
+  consumer_auto_offset_store: false
+  isolation_level: read_committed
+
+operator:
+  operator_id: operator:nexus-b2a-ci
+  reason: Correct unsupported event version after governed review
+  submitted_at: 2026-06-15T12:00:00Z
+
+gate:
+  source_fixture_records: 2
+  expected_forward_records: 1
+  expected_dead_letter_records: 1
+  expected_redrive_requests: 1
+  expected_replacement_records: 1
+  poll_timeout_seconds: 30
+  require_fresh_empty_topics: true
+
+scope:
+  portable_b1_status: PASS
+  service_dead_letter_topic_status: PASS
+  persistent_dagster_status: NOT_RUN
+  retained_service_restart_status: NOT_RUN
+  operational_alert_delivery_status: NOT_RUN
+  full_r2d_b_status: IN_PROGRESS
+  full_g2_status: OPEN

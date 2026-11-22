@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "classification": "synthetic",
+  "generator": "nexus-r2-supply-network",
+  "profile": "smoke",
+  "seed": 20260718,
+  "start_date": "2026-06-01",
+  "days": 28,
+  "planning_cutoff": "2026-06-30T00:00:00Z",
+  "early_replay_cutoff": "2026-06-20T00:00:00Z",
+  "sources": [
+    {
+      "dataset": "source.fulfillment_outcomes",
+      "file_name": "fulfillment_outcomes.csv",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "record_count": 112
+    },
+    {
+      "dataset": "source.inventory_adjustments",
+      "file_name": "inventory_events.jsonl",
+      "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "record_count": 9
+    },
+    {
+      "dataset": "source.opening_inventory",
+      "file_name": "opening_inventory.csv",
+      "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "record_count": 4
+    },
+    {
+      "dataset": "source.product_locations",
+      "file_name": "product_locations.csv",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "record_count": 4
+    },
+    {
+      "dataset": "source.purchase_orders",
+      "file_name": "purchase_orders.csv",
+      "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "record_count": 20
+    },
+    {
+      "dataset": "source.receipts",
+      "file_name": "receipts.csv",
+      "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "record_count": 16
+    },
+    {
+      "dataset": "source.suppliers",
+      "file_name": "suppliers.csv",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "record_count": 2
+    }
+  ],
+  "expected_controls": {
+    "accepted_inventory_adjustments": 5,
+    "deferred_inventory_adjustments": 1,
+    "fulfillment_rows": 112,
+    "opening_inventory_rows": 4,
+    "product_location_rows": 4,
+    "purchase_order_rows": 20,
+    "quarantine_rows": 4,
+    "receipt_rows": 16,
+    "supplier_rows": 2,
+    "superseded_inventory_adjustments": 1
+  }
+}

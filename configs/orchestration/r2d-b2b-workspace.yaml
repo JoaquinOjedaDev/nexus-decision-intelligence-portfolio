@@ -1,0 +1,4 @@
+load_from:
+  - python_module:
+      module_name: nexus.orchestration.r2d_b2b_definitions
+      location_name: r2d_b2b

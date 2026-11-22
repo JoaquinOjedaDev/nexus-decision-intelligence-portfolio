@@ -1,0 +1,56 @@
+release: R2D-B2b
+contract_version: 1.0.0
+
+inherited_r2b:
+  config_path: configs/orchestration/r2b-backfill.yaml
+  config_sha256: 8ea10d99101638fe8b3e0194ae255246b44c62c0f6378761eb303db340b7af8b
+  orchestration_code_sha256: 63e6b658c26049a36fcf569121d4f86a740255d1c71517c8306b8aac8ace44e9
+
+dagster:
+  job_name: r2d_b2b_backfill_job
+  location_name: r2d_b2b
+  partition_keys:
+    - r2b-v1__aa25517d49cb6c36b76e9b6a218a83e7419359f5a7c40626412797ca13f8d768__20260620T000000Z
+    - r2b-v1__aa25517d49cb6c36b76e9b6a218a83e7419359f5a7c40626412797ca13f8d768__20260630T000000Z
+  expected_run_count: 2
+  maximum_concurrent_runs: 1
+  daemon_heartbeat_timeout_seconds: 45
+  run_timeout_seconds: 240
+  queued_pause_observation_seconds: 2
+  require_actual_backfill_record: true
+  require_daemon_restart: true
+  dequeue_interval_seconds: 5
+  require_cross_process_readback: true
+
+postgres:
+  configured_reference: postgres:17.6-alpine
+  schema_name: public
+  run_storage_class: dagster_postgres.run_storage.run_storage.PostgresRunStorage
+  event_log_storage_class: dagster_postgres.event_log.event_log.PostgresEventLogStorage
+  schedule_storage_class: dagster_postgres.schedule_storage.schedule_storage.PostgresScheduleStorage
+  required_tables:
+    - asset_keys
+    - bulk_actions
+    - event_logs
+    - jobs
+    - run_tags
+    - runs
+    - secondary_indexes
+
+resource_budget:
+  wall_time_seconds: 300
+  peak_rss_mib: 4096
+  maximum_native_threads: 512
+  artifact_mib: 1024
+  shutdown_seconds: 15
+  maximum_descendant_processes: 32
+
+scope:
+  inherited_r2b_status: PASS
+  persistent_dagster_status: PASS
+  actual_backfill_status: PASS
+  dagster_process_restart_status: PASS
+  retained_multiservice_restart_status: NOT_RUN
+  operational_alert_delivery_status: NOT_RUN
+  full_r2d_b_status: IN_PROGRESS
+  full_g2_status: OPEN

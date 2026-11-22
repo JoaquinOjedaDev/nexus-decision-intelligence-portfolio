@@ -1,0 +1,5 @@
+name: dev
+data: regenerated_synthetic_smoke
+identity_issuer: local_test_issuer
+external_llm_required: false
+mutable_experiments_allowed: true

@@ -1,0 +1,6 @@
+name: release
+data: rebuilt_from_published_reproducibility_manifest
+identity_issuer: release_scoped_oidc_contract
+external_llm_required: false
+promoted_artifacts_only: true
+mutable_volumes_promoted: false

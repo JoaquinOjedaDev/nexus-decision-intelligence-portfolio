@@ -1,0 +1,124 @@
+release: R4A
+contract_version: 1.0.0
+profile: bounded-four-line-synthetic
+classification: synthetic
+decision_time: "2026-02-25T04:00:00Z"
+horizon_days: 14
+budget_cents: 360000
+
+forecast_authority:
+  selected_model: seasonal_naive_empirical_intervals
+  current_champion: seasonal_naive_empirical_intervals
+  challenger: global_lightgbm_quantile_candidate
+  challenger_gate_status: CHALLENGER_LOST
+  superiority_claims_allowed: false
+  adapter_path: fixtures/r4a/champion-forecast-adapter.json
+  adapter_file_sha256: eddfa5162fdd32ff6f0218ffe6066dcf24c09b37c311e803e548686605c5aad4
+  source_contract: nexus.r3b.persisted-forecast-bundle.v1
+  source_forecast_artifact_sha256: 72714ca2b3074d0170e5ccbe113fbb5483fb1717b9aebeca3ddd1315eadcd3da
+  source_promotion_artifact_sha256: a4bb29a59e30092ee25336c9af3a0edf3d9dac9a67852d9d529ab482a7dbf1ee
+
+portfolio:
+  - sku_id: SKU-00001
+    location_id: LOC-001
+    supplier_id: SUP-0001
+    initial_inventory_units: 42
+    regular_lead_time_days: 2
+    order_multiple_units: 10
+    minimum_order_units: 20
+    maximum_order_units: 180
+    unit_volume: 2
+    unit_cost_cents: 700
+    fixed_order_cost_cents: 1400
+    holding_cost_cents_per_unit_day: 8
+    stockout_cost_cents_per_unit: 2400
+    expedite_cost_cents_per_unit: 1500
+    working_capital_cost_cents_per_unit: 10
+    service_target_bps: 9500
+  - sku_id: SKU-00001
+    location_id: LOC-002
+    supplier_id: SUP-0001
+    initial_inventory_units: 32
+    regular_lead_time_days: 3
+    order_multiple_units: 10
+    minimum_order_units: 20
+    maximum_order_units: 140
+    unit_volume: 2
+    unit_cost_cents: 720
+    fixed_order_cost_cents: 1300
+    holding_cost_cents_per_unit_day: 8
+    stockout_cost_cents_per_unit: 2300
+    expedite_cost_cents_per_unit: 1450
+    working_capital_cost_cents_per_unit: 10
+    service_target_bps: 9400
+  - sku_id: SKU-00002
+    location_id: LOC-002
+    supplier_id: SUP-0002
+    initial_inventory_units: 25
+    regular_lead_time_days: 2
+    order_multiple_units: 5
+    minimum_order_units: 10
+    maximum_order_units: 100
+    unit_volume: 3
+    unit_cost_cents: 980
+    fixed_order_cost_cents: 1200
+    holding_cost_cents_per_unit_day: 10
+    stockout_cost_cents_per_unit: 2700
+    expedite_cost_cents_per_unit: 1800
+    working_capital_cost_cents_per_unit: 13
+    service_target_bps: 9500
+  - sku_id: SKU-00003
+    location_id: LOC-001
+    supplier_id: SUP-0002
+    initial_inventory_units: 18
+    regular_lead_time_days: 2
+    order_multiple_units: 5
+    minimum_order_units: 10
+    maximum_order_units: 80
+    unit_volume: 4
+    unit_cost_cents: 1250
+    fixed_order_cost_cents: 1100
+    holding_cost_cents_per_unit_day: 12
+    stockout_cost_cents_per_unit: 3100
+    expedite_cost_cents_per_unit: 2200
+    working_capital_cost_cents_per_unit: 16
+    service_target_bps: 9500
+
+location_capacities:
+  - location_id: LOC-001
+    storage_capacity_volume: 520
+    expedite_capacity_units_per_day: 40
+  - location_id: LOC-002
+    storage_capacity_volume: 430
+    expedite_capacity_units_per_day: 40
+
+supplier_capacities:
+  - supplier_id: SUP-0001
+    regular_capacity_units: 260
+  - supplier_id: SUP-0002
+    regular_capacity_units: 160
+
+scenarios:
+  names: [normal, demand_surge, supplier_delay]
+  planning_seeds: [4101, 4102]
+  evaluation_seeds: [4201, 4202, 4203, 4204, 4205, 4206]
+  demand_quantile_weights_bps: [2000, 6000, 2000]
+  demand_surge_percent: 135
+  supplier_delay_days: 3
+
+solver:
+  engine: ortools_cp_sat
+  engine_version_range: ">=9.15,<9.16"
+  workers: 1
+  random_seed: 4401
+  max_deterministic_time: 60.0
+  max_wall_time_seconds: 30.0
+  deterministic_tie_break: lexicographic_order_quantity
+  transfers: absent
+
+evaluation:
+  confidence_level_bps: 9500
+  bootstrap_resamples: 400
+  bootstrap_seed: 4402
+  frozen_policy_tuning: true
+  superiority_claims_allowed: false

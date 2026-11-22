@@ -1,0 +1,100 @@
+contract_version: nexus.runtime-policy.v1
+classification: synthetic
+currency: USD
+horizon_days: 14
+budget_cents: 360000
+# Open orders retain their actual Gold value in evidence. They are not instant stock.
+# The shared R4A optimizer has no scheduled pre-existing receipt input; this bounded
+# conservative policy excludes them from usable inventory and labels that limitation.
+inventory_policy: gold_on_hand_only_open_orders_excluded
+lines:
+  - sku_id: SKU-001
+    location_id: DC-ARG-01
+    regular_lead_time_days: 2
+    order_multiple_units: 10
+    minimum_order_units: 20
+    maximum_order_units: 180
+    unit_volume: 2
+    unit_cost_cents: 700
+    fixed_order_cost_cents: 1400
+    holding_cost_cents_per_unit_day: 8
+    stockout_cost_cents_per_unit: 2400
+    expedite_cost_cents_per_unit: 1500
+    working_capital_cost_cents_per_unit: 10
+    service_target_bps: 9500
+  - sku_id: SKU-001
+    location_id: DC-ARG-02
+    regular_lead_time_days: 3
+    order_multiple_units: 10
+    minimum_order_units: 20
+    maximum_order_units: 140
+    unit_volume: 2
+    unit_cost_cents: 720
+    fixed_order_cost_cents: 1300
+    holding_cost_cents_per_unit_day: 8
+    stockout_cost_cents_per_unit: 2300
+    expedite_cost_cents_per_unit: 1450
+    working_capital_cost_cents_per_unit: 10
+    service_target_bps: 9400
+  - sku_id: SKU-002
+    location_id: DC-ARG-01
+    regular_lead_time_days: 2
+    order_multiple_units: 5
+    minimum_order_units: 10
+    maximum_order_units: 100
+    unit_volume: 3
+    unit_cost_cents: 980
+    fixed_order_cost_cents: 1200
+    holding_cost_cents_per_unit_day: 10
+    stockout_cost_cents_per_unit: 2700
+    expedite_cost_cents_per_unit: 1800
+    working_capital_cost_cents_per_unit: 13
+    service_target_bps: 9500
+  - sku_id: SKU-002
+    location_id: DC-ARG-02
+    regular_lead_time_days: 2
+    order_multiple_units: 5
+    minimum_order_units: 10
+    maximum_order_units: 80
+    unit_volume: 4
+    unit_cost_cents: 1250
+    fixed_order_cost_cents: 1100
+    holding_cost_cents_per_unit_day: 12
+    stockout_cost_cents_per_unit: 3100
+    expedite_cost_cents_per_unit: 2200
+    working_capital_cost_cents_per_unit: 16
+    service_target_bps: 9500
+location_capacities:
+  - location_id: DC-ARG-01
+    storage_capacity_volume: 620
+    expedite_capacity_units_per_day: 40
+  - location_id: DC-ARG-02
+    storage_capacity_volume: 530
+    expedite_capacity_units_per_day: 40
+supplier_capacities:
+  - supplier_id: SUP-001
+    regular_capacity_units: 260
+  - supplier_id: SUP-002
+    regular_capacity_units: 260
+scenarios:
+  names: [normal, demand_surge, supplier_delay]
+  planning_seeds: [7101, 7102]
+  evaluation_seeds: [7201, 7202, 7203, 7204, 7205, 7206]
+  demand_quantile_weights_bps: [2000, 6000, 2000]
+  demand_surge_percent: 135
+  supplier_delay_days: 3
+solver:
+  engine: ortools_cp_sat
+  engine_version_range: ">=9.15,<9.16"
+  workers: 1
+  random_seed: 7401
+  max_deterministic_time: 60.0
+  max_wall_time_seconds: 30.0
+  deterministic_tie_break: lexicographic_order_quantity
+  transfers: absent
+evaluation:
+  confidence_level_bps: 9500
+  bootstrap_resamples: 400
+  bootstrap_seed: 7402
+  frozen_policy_tuning: true
+  superiority_claims_allowed: false

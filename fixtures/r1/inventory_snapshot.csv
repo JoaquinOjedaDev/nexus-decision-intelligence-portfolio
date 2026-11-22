@@ -1,0 +1,2 @@
+snapshot_at,sku_id,location_id,on_hand_qty,on_order_qty,available_at
+2026-07-15T07:00:00Z,SKU-001,DC-ARG-01,40,10,2026-07-15T07:00:03Z

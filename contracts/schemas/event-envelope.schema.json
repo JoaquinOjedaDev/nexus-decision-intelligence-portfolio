@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.local/contracts/event-envelope/1.0",
+  "title": "EventEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": { "type": "string", "pattern": "^1\\.[0-9]+$", "default": "1.0" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$", "minLength": 3, "maxLength": 120 },
+    "event_version": { "type": "integer", "minimum": 1, "default": 1 },
+    "source": { "$ref": "#/$defs/identifier" },
+    "subject_id": { "$ref": "#/$defs/identifier" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "ingested_at": { "type": "string", "format": "date-time" },
+    "idempotency_key": { "$ref": "#/$defs/identifier" },
+    "correlation_id": { "anyOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }], "default": null },
+    "trace_id": { "anyOf": [{ "$ref": "#/$defs/identifier" }, { "type": "null" }], "default": null },
+    "payload": { "type": "object" }
+  },
+  "required": ["event_id", "event_type", "source", "subject_id", "occurred_at", "ingested_at", "idempotency_key", "payload"],
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$", "minLength": 1, "maxLength": 160 }
+  }
+}

@@ -1,0 +1,437 @@
+version: 2
+
+models:
+  - name: stg_r2_product_locations
+    description: Latest product-location assignment visible at the planning cutoff.
+    columns:
+      - name: sku_location_key
+        data_tests: [unique, not_null]
+      - name: sku_id
+        data_tests: [not_null]
+      - name: location_id
+        data_tests: [not_null]
+      - name: supplier_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: active
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_suppliers
+    description: Latest supplier master record visible at the planning cutoff.
+    columns:
+      - name: supplier_id
+        data_tests: [unique, not_null]
+      - name: supplier_name
+        data_tests: [not_null]
+      - name: active
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_opening_inventory
+    description: Typed opening snapshots available no later than the planning cutoff.
+    columns:
+      - name: opening_inventory_key
+        data_tests: [unique, not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: on_hand_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: snapshot_at
+        data_tests: [not_null]
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_fulfillment_outcomes
+    description: Point-in-time-safe demand and fulfilled-unit observations.
+    columns:
+      - name: fulfillment_id
+        data_tests: [unique, not_null]
+      - name: demand_date
+        data_tests: [not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: demand_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: fulfilled_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_purchase_orders
+    description: Purchase orders ordered and available by the planning cutoff.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: supplier_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: ordered_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: ordered_at
+        data_tests: [not_null]
+      - name: expected_at
+        data_tests: [not_null]
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_receipts
+    description: Receipts received and available by the planning cutoff.
+    columns:
+      - name: receipt_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_purchase_orders')
+                field: order_id
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: supplier_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: received_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: received_at
+        data_tests: [not_null]
+      - name: available_at
+        data_tests: [not_null]
+
+  - name: stg_r2_inventory_adjustments
+    description: Typed validated inventory events, including future and late-arriving records.
+    data_tests:
+      - r2_unique_combination:
+          arguments:
+            columns: [source, logical_event_id, revision]
+    columns:
+      - name: contract_version
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['1.0']
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: event_version
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
+      - name: source
+        data_tests: [not_null]
+      - name: logical_event_id
+        data_tests: [not_null]
+      - name: revision
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: idempotency_key
+        data_tests: [unique, not_null]
+      - name: occurred_at
+        data_tests: [not_null]
+      - name: ingested_at
+        data_tests: [not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: delta_qty
+        data_tests: [not_null]
+      - name: reason_code
+        data_tests: [not_null]
+
+  - name: int_r2_effective_inventory_adjustments
+    description: Highest contiguous correction revision visible per source and logical event.
+    data_tests:
+      - r2_unique_combination:
+          arguments:
+            columns: [source, logical_event_id]
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: source
+        data_tests: [not_null]
+      - name: logical_event_id
+        data_tests: [not_null]
+      - name: revision
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: idempotency_key
+        data_tests: [unique, not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: delta_qty
+        data_tests: [not_null]
+
+  - name: int_r2_deferred_inventory_adjustments
+    description: Valid events deferred by time or an incomplete visible correction prefix.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: source
+        data_tests: [not_null]
+      - name: logical_event_id
+        data_tests: [not_null]
+      - name: idempotency_key
+        data_tests: [unique, not_null]
+      - name: deferred_reason
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - future_business_and_arrival
+                  - future_business_time
+                  - incomplete_visible_revision_chain
+                  - late_arrival
+
+  - name: int_r2_superseded_inventory_adjustments
+    description: Visible contiguous revisions replaced by a later effective revision.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: source
+        data_tests: [not_null]
+      - name: logical_event_id
+        data_tests: [not_null]
+
+  - name: gold_r2_demand_history
+    description: Daily demand at the product-location grain for forecasting.
+    columns:
+      - name: demand_history_key
+        data_tests: [unique, not_null]
+      - name: demand_date
+        data_tests: [not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: demand_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: fulfillment_record_count
+        data_tests:
+          - not_null
+          - r2_nonnegative
+
+  - name: gold_r2_fulfillment_outcomes
+    description: Fulfillment results with unfulfilled units and bounded fill rate.
+    columns:
+      - name: fulfillment_id
+        data_tests: [unique, not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: demand_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: fulfilled_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: unfulfilled_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: fill_rate
+        data_tests:
+          - not_null
+          - r2_between:
+              arguments:
+                min_value: 0.0
+                max_value: 1.0
+
+  - name: gold_r2_open_orders
+    description: Orders with positive remaining quantity at the planning cutoff.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: sku_location_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: supplier_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: ordered_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: received_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: open_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+
+  - name: gold_r2_supplier_performance
+    description: Supplier order completion, timeliness, and received-unit metrics.
+    columns:
+      - name: supplier_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: supplier_name
+        data_tests: [not_null]
+      - name: order_count
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: completed_order_count
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: on_time_completed_order_count
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: received_units
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: on_time_completion_rate
+        data_tests:
+          - not_null
+          - r2_between:
+              arguments:
+                min_value: 0.0
+                max_value: 1.0
+
+  - name: gold_r2_inventory_position
+    description: Reconciled inventory and on-order position at the planning cutoff.
+    columns:
+      - name: sku_location_key
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_product_locations')
+                field: sku_location_key
+      - name: sku_id
+        data_tests: [not_null]
+      - name: location_id
+        data_tests: [not_null]
+      - name: supplier_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_r2_suppliers')
+                field: supplier_id
+      - name: opening_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: receipt_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: fulfilled_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: adjustment_qty
+        data_tests: [not_null]
+      - name: on_hand_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: on_order_qty
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: effective_adjustment_count
+        data_tests:
+          - not_null
+          - r2_nonnegative
+      - name: planning_cutoff
+        data_tests: [not_null]

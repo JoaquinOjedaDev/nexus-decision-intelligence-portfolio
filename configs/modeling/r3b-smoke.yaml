@@ -1,0 +1,183 @@
+release: R3B
+contract_version: 1.0.0
+profile: r2c-synthetic-contract-smoke
+seed: 20260718
+
+data_contract:
+  source_generator: nexus-r2c-representative-supply-network
+  r2c_profile: smoke
+  classification: synthetic
+  demand_dataset: representative.demand_history
+  product_location_dataset: representative.product_locations
+  lead_time_dataset: representative.lead_time_history
+  target: observed_sales_qty
+  activity_policy: active_only
+  censoring_policy: uncensored_only
+  availability_policy: available_at_lte_issue_time
+  latent_demand_field: synthetic_latent_demand_qty
+  latent_demand_usage: post_persistence_evaluation_only
+  cohort_field: synthetic_cohort
+  cohort_usage: post_persistence_evaluation_only
+
+forecast_contract:
+  grain: sku-location-day
+  frequency: daily
+  issue_time_utc: "04:00:00"
+  horizons_days: [7, 14, 28]
+  maximum_horizon_days: 28
+  quantiles: [0.025, 0.10, 0.50, 0.90, 0.975]
+  cold_start_fallback: seasonal_naive_empirical_intervals
+  minimum_history_observations_for_learned_candidate: 14
+
+feature_contract:
+  version: r3b-pit-v1
+  lags_days: [1, 7, 14]
+  rolling_windows_days: [7, 14]
+  allowed_demand_features:
+    - lag_sales_1
+    - lag_sales_7
+    - lag_sales_14
+    - rolling_mean_sales_7
+    - rolling_mean_sales_14
+    - rolling_nonzero_rate_7
+    - rolling_nonzero_rate_14
+    - days_since_nonzero
+    - history_count
+    - target_day_of_week
+    - horizon_days
+  allowed_lead_time_features:
+    - ordered_qty
+    - promised_lead_time_days
+    - order_day_of_week
+    - order_month
+  forbidden_fields:
+    - synthetic_cohort
+    - synthetic_latent_demand_qty
+    - observed_sales_qty
+    - fulfilled_qty
+    - lost_sales_qty
+    - stockout_censored
+    - is_active
+    - available_at
+    - supplier_id
+    - promotion_flag
+    - disruption_flag
+    - received_qty
+    - receipt_count
+    - completed_at
+    - label_available_at
+    - status
+    - actual_lead_time_days
+    - delay_days
+    - is_late
+    - right_censored
+    - lead_time_regime
+    - baseline_lead_time_days
+    - variability_days
+  fit_scope: each_origin_only
+
+demand_model:
+  model_name: global_lightgbm_quantile
+  objective: quantile
+  metric: quantile
+  training_strategy: one_model_per_quantile
+  device_type: cpu
+  boosting_type: gbdt
+  deterministic: true
+  force_col_wise: true
+  seed: 20260718
+  data_random_seed: 20260718
+  feature_fraction_seed: 20260718
+  bagging_seed: 20260718
+  num_threads: 2
+  num_boost_round: 64
+  early_stopping_rounds: 0
+
+lead_time_model:
+  target: actual_lead_time_days
+  label_availability_field: label_available_at
+  maturity_policy: label_available_at_lte_origin
+  right_censoring_policy: exclude_right_censored
+  allowed_features:
+    - ordered_qty
+    - promised_lead_time_days
+    - order_day_of_week
+    - order_month
+  baseline: empirical_mature_uncensored_quantiles
+  minimum_training_labels: 20
+
+calibration:
+  method: empirical_residual_quantile_offsets
+  fit_origin_role: calibration
+  application_origin_role: final_stress
+  as_of_policy: label_available_at_lte_application_issue_time
+  maturity_policy: complete_horizon_mature_only
+  minimum_support_per_horizon: 20
+  insufficient_support_policy: abstain_insufficient_evidence
+
+reconciliation:
+  method: arithmetic_bottom_up
+  hierarchy: [sku_location, sku, network]
+  quantile_aggregation: marginal_quantile_sums
+  arithmetic_coherence_required: true
+  joint_distribution_calibration_claimed: false
+
+evaluation:
+  rolling_origins:
+    - name: learned_policy_diagnostic
+      issue_time: "2026-01-19T04:00:00Z"
+      role: diagnostic
+    - name: frozen_calibration
+      issue_time: "2026-01-26T04:00:00Z"
+      role: calibration
+    - name: untouched_final_stress
+      issue_time: "2026-02-25T04:00:00Z"
+      role: final_stress
+  primary_metric: weighted_interval_score
+  equal_observation_weights: true
+  mature_labels_only: true
+  final_stress_tuning_allowed: false
+  segment_dimensions: [horizon, hierarchy, synthetic_cohort, cold_start]
+  bootstrap:
+    confidence_level: 0.95
+    resamples: 200
+    resampling_unit: sku_location_origin_block
+    seed: 20260718
+
+promotion:
+  automatic: false
+  current_champion: seasonal_naive_empirical_intervals
+  minimum_wis_improvement: 0.10
+  candidate_must_win: true
+  require_positive_paired_bootstrap_lower_bound: true
+  human_approval_required: true
+  synthetic_performance_claims_allowed: false
+  allowed_statuses:
+    - ELIGIBLE_BUT_BLOCKED_SYNTHETIC
+    - CHALLENGER_LOST
+    - ABSTAIN_INSUFFICIENT_EVIDENCE
+    - REJECTED_GATE_FAILURE
+  passing_candidate_status: ELIGIBLE_BUT_BLOCKED_SYNTHETIC
+  losing_candidate_status: CHALLENGER_LOST
+  insufficient_evidence_status: ABSTAIN_INSUFFICIENT_EVIDENCE
+  gate_failure_status: REJECTED_GATE_FAILURE
+
+resource_budget:
+  wall_time_scope: r3b_complete_verification
+  wall_time_seconds: 300
+  peak_rss_scope: complete_process_tree_high_water
+  peak_rss_mib: 2048
+  thread_scope: complete_process_tree_native_threads_high_water
+  maximum_process_tree_threads: 96
+  artifact_scope: r3b_governed_artifacts_including_tracking_store
+  artifact_mib: 100
+  shutdown_scope: process_tree_descendants_after_cleanup
+  shutdown_seconds: 10
+  maximum_surviving_descendants: 0
+
+numeric_tolerance:
+  comparison_scope: cross_platform_forecast_and_metric_values
+  absolute_tolerance: 0.0000001
+  relative_tolerance: 0.000001
+  nan_policy: forbid
+  infinity_policy: forbid

@@ -1,0 +1,139 @@
+{
+  "contract": "nexus.local-copilot-documents.v1",
+  "scope": "fictional-development-only",
+  "documents": [
+    {
+      "document_id": "supplier-sup-0001-terms",
+      "version": "v1",
+      "kind": "supplier_terms",
+      "subject_id": "SUP-0001",
+      "effective_from": "2026-01-01",
+      "effective_until": null,
+      "supersedes": null,
+      "roles": [
+        "planner",
+        "approver"
+      ],
+      "locations": [
+        "LOC-001",
+        "LOC-002"
+      ],
+      "passages": [
+        {
+          "passage_id": "payment",
+          "claim_key": "supplier.sup_0001.payment",
+          "claim_value": "net_30",
+          "text": "Fictional NEXUS demo terms for SUP-0001: invoices are due 30 calendar days after acceptance. This clause is synthetic and has no legal effect.",
+          "sha256": "12f875a327690b1a4ebb0510ad5964ec49f794518dfc17a1719d7a609a4affff"
+        }
+      ]
+    },
+    {
+      "document_id": "supplier-sup-0002-terms",
+      "version": "v1",
+      "kind": "supplier_terms",
+      "subject_id": "SUP-0002",
+      "effective_from": "2026-01-01",
+      "effective_until": null,
+      "supersedes": null,
+      "roles": [
+        "planner",
+        "approver"
+      ],
+      "locations": [
+        "LOC-001",
+        "LOC-002"
+      ],
+      "passages": [
+        {
+          "passage_id": "payment",
+          "claim_key": "supplier.sup_0002.payment",
+          "claim_value": "net_45",
+          "text": "Fictional NEXUS demo terms for SUP-0002: invoices are due 45 calendar days after acceptance. This clause is synthetic and has no legal effect.",
+          "sha256": "1f9b3e7270ae63def5d89350837e793ef21063fbb039dc626e8c4546c2a5fae4"
+        }
+      ]
+    },
+    {
+      "document_id": "supplier-sup-001-terms",
+      "version": "v1",
+      "kind": "supplier_terms",
+      "subject_id": "SUP-001",
+      "effective_from": "2026-01-01",
+      "effective_until": null,
+      "supersedes": null,
+      "roles": [
+        "planner",
+        "approver"
+      ],
+      "locations": [
+        "DC-ARG-01",
+        "DC-ARG-02"
+      ],
+      "passages": [
+        {
+          "passage_id": "payment",
+          "claim_key": "supplier.sup_001.payment",
+          "claim_value": "net_30",
+          "text": "Fictional NEXUS demo terms for SUP-001: invoices are due 30 calendar days after acceptance. This clause is synthetic and has no legal effect.",
+          "sha256": "a06310d947153d8f684cb7498634aecea672dc70abd053131b76a84c02f89984"
+        }
+      ]
+    },
+    {
+      "document_id": "supplier-sup-002-terms",
+      "version": "v1",
+      "kind": "supplier_terms",
+      "subject_id": "SUP-002",
+      "effective_from": "2026-01-01",
+      "effective_until": null,
+      "supersedes": null,
+      "roles": [
+        "planner",
+        "approver"
+      ],
+      "locations": [
+        "DC-ARG-01",
+        "DC-ARG-02"
+      ],
+      "passages": [
+        {
+          "passage_id": "payment",
+          "claim_key": "supplier.sup_002.payment",
+          "claim_value": "net_45",
+          "text": "Fictional NEXUS demo terms for SUP-002: invoices are due 45 calendar days after acceptance. This clause is synthetic and has no legal effect.",
+          "sha256": "1bf97a9353afb3f73eb2b7e7ec923b197af42e7b564775db5a4c982e5406231e"
+        }
+      ]
+    },
+    {
+      "document_id": "purchase-approval-policy",
+      "version": "v1",
+      "kind": "policy",
+      "subject_id": null,
+      "effective_from": "2026-01-01",
+      "effective_until": null,
+      "supersedes": null,
+      "roles": [
+        "planner",
+        "approver",
+        "auditor"
+      ],
+      "locations": [
+        "LOC-001",
+        "LOC-002",
+        "DC-ARG-01",
+        "DC-ARG-02"
+      ],
+      "passages": [
+        {
+          "passage_id": "maker-checker",
+          "claim_key": "order.approval",
+          "claim_value": "independent_approval",
+          "text": "Fictional NEXUS demo policy: a planner may prepare a draft. A separate authorized approver must approve the exact current recommendation before local mock execution.",
+          "sha256": "364a5f62e5b2d49229489b32755a9f7e532e5666cb463f5354eedbde44334ac0"
+        }
+      ]
+    }
+  ]
+}

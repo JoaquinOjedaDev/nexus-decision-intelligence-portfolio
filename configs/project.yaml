@@ -1,0 +1,35 @@
+project:
+  name: nexus-decision-intelligence-platform
+  contract_version: 1.0.0
+
+decision:
+  name: weekly_replenishment
+  grain: sku-location-week
+  cadence_days: 7
+  horizons_days: [7, 14, 28]
+  action: replenish_inventory
+  primary_objective: minimize_expected_total_cost
+  service_level_floor: 0.95
+  actors: [planner, approver, auditor]
+  maker_checker_required: true
+
+source_scope:
+  batch: governed_synthetic_profile
+  optional_benchmark: licensed_external_source_after_manual_review
+  external_event: inventory_adjusted
+  internal_events:
+    - recommendation_created
+    - approval_requested
+    - approved
+    - rejected
+    - execution_requested
+    - execution_acknowledged
+    - execution_reconciled
+    - outcome_observed
+
+non_goals:
+  - autonomous_execution
+  - real_erp_connector
+  - multi_tenant_operation
+  - exactly_once_delivery_claim
+  - automatic_model_promotion

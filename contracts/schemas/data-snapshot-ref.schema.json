@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.local/contracts/data-snapshot-ref/1.0",
+  "title": "DataSnapshotRef",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "dataset": { "$ref": "#/$defs/identifier" },
+    "snapshot_id": { "$ref": "#/$defs/identifier" },
+    "schema_version": { "$ref": "#/$defs/identifier" },
+    "as_of": { "type": "string", "format": "date-time" },
+    "content_sha256": { "$ref": "#/$defs/sha256" },
+    "row_count": { "type": "integer", "minimum": 0 },
+    "partition_keys": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "default": [] }
+  },
+  "required": ["dataset", "snapshot_id", "schema_version", "as_of", "content_sha256", "row_count"],
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$", "minLength": 1, "maxLength": 160 },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

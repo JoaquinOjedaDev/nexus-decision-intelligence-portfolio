@@ -1,0 +1,12 @@
+version: 1.0.0
+scheduled_cadence_days: 7
+out_of_cycle:
+  enabled: true
+  cooldown_minutes: 60
+  qualifying_events:
+    - supplier_outage
+    - inventory_correction
+    - execution_rejected
+    - stockout_risk_breach
+  material_change_fields: [quantities, costs, constraints, policy_version, data_snapshot]
+  stale_plan_requires_new_approval: true

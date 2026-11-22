@@ -1,0 +1,52 @@
+release: R2B
+contract_version: 1.0.0
+profile: r2a-synthetic-contract-smoke
+seed: 20260718
+
+source_contract:
+  generator: nexus-r2-supply-network
+  source_manifest_sha256: 03e32a3f197839134e44b8f6d384787a99ec22e2c088ee4edea8d8322814346b
+  source_manifest_file_sha256: aa25517d49cb6c36b76e9b6a218a83e7419359f5a7c40626412797ca13f8d768
+
+partition_contract:
+  key_format: r2b_v1__manifest_sha256__cutoff_utc
+  partitions:
+    - name: early
+      planning_cutoff: "2026-06-20T00:00:00Z"
+      role: correction_visibility_probe
+    - name: final
+      planning_cutoff: "2026-06-30T00:00:00Z"
+      role: release_snapshot
+
+retry_contract:
+  maximum_retries: 1
+  delay_seconds: 0
+  injected_failure:
+    partition: final
+    stage: post_validation
+    failing_attempts: 1
+
+evidence_contract:
+  require_direct_parity: true
+  require_reverse_order_replay: true
+  require_idempotent_rerun: true
+  bind_dagster_run_ids_to_execution_only: true
+
+resource_budget:
+  wall_time_scope: r2b_complete_verification
+  wall_time_seconds: 240
+  peak_rss_scope: orchestrator_process_tree_high_water
+  peak_rss_mib: 2048
+  thread_scope: python_interpreter_threads_after_run
+  maximum_python_threads: 4
+  artifact_scope: r2b_governed_manifests_and_r2_snapshots
+  artifact_mib: 100
+
+deferred_full_g2:
+  - licensed_external_demand
+  - demo_and_full_data_profiles
+  - redpanda_transport_parity
+  - operator_correction_redrive
+  - production_alert_delivery
+  - iceberg_scale_profile
+  - dagster_daemon_ui_ha

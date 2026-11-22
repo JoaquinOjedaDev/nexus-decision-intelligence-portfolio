@@ -1,0 +1,12 @@
+storage:
+  postgres:
+    postgres_url:
+      env: NEXUS_R2D_B2B_POSTGRES_DSN
+run_queue:
+  max_concurrent_runs: 1
+  dequeue_interval_seconds: 5
+run_launcher:
+  module: dagster
+  class: DefaultRunLauncher
+telemetry:
+  enabled: false

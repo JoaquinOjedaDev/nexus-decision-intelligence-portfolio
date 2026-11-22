@@ -1,0 +1,25 @@
+{
+  "controls": {
+    "cohort_counts": {
+      "cold_start": 4,
+      "erratic": 8,
+      "intermittent": 10,
+      "lumpy": 4,
+      "smooth": 14
+    },
+    "completed_orders": 190,
+    "demand_rows": 3360,
+    "disruption_rows": 126,
+    "late_arriving_demand_rows": 139,
+    "late_orders": 70,
+    "lead_time_rows": 228,
+    "open_orders": 15,
+    "partial_orders": 23,
+    "product_location_rows": 40,
+    "promotion_rows": 108,
+    "stockout_censored_rows": 152,
+    "supplier_rows": 5
+  },
+  "dataset_semantic_sha256": "411bfe0cc655ccfa8a18160e6457d1fa2f4f99433e9f9c784848469027cb094d",
+  "profile_contract_sha256": "2b84a1c1c744d09b83f831bb91f7d5abbc12bb10211c013ad157550f8fa0451c"
+}

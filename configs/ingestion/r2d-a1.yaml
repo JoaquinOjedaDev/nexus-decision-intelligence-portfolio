@@ -1,0 +1,103 @@
+release: R2D-A1
+contract_version: 1.0.0
+profile: r2a-synthetic-contract-smoke
+seed: 20260718
+
+source_contract:
+  generator: nexus-r2-supply-network
+  source_manifest_sha256: 03e32a3f197839134e44b8f6d384787a99ec22e2c088ee4edea8d8322814346b
+  source_manifest_file_sha256: aa25517d49cb6c36b76e9b6a218a83e7419359f5a7c40626412797ca13f8d768
+  inventory_events_file_sha256: 0418e3bf2d1212c766328c94d3ed46342c731f1cdbde954acc2024aea5bdb39c
+  inventory_event_count: 9
+  raw_value_multiset_sha256: d2b8ca4dc666eec083c4b3d795c102ba2d10255cfaa68aaf32a018952b4b7242
+
+topic_contract:
+  topic: inventory.adjusted.v1
+  partition_count: 2
+  replication_factor: 1
+  key_format: source:logical_event_id
+  partitioner: sha256_modulo
+  reconstruction_order: partition_then_offset
+  future_service_producer_acks: all
+  portable_acknowledgement_kind: simulated_portable
+  real_broker_ack_claim: false
+  consumer_auto_offset_commit: false
+  routing_key_overrides:
+    - raw_value_sha256: c3b9d488773f31ee841b256a2da6f6a6b1d9224a06268abe1d33000814eb38ec
+      routing_key: synthetic.wms:ADJ-MALFORMED-001
+
+schema_contract:
+  envelope_contract_version: "1.0"
+  inventory_event_version: 1
+  envelope_schema_id: https://nexus.local/contracts/event-envelope/1.0
+  payload_schema_id: https://nexus.local/contracts/r2-inventory-adjustment-payload.schema.json
+  envelope_schema_sha256: 69337c05164d83876f51efb6adda5c799adf19aa5a3a3f8a4a545188fd442380
+  payload_schema_sha256: c0082351aadcd1359ad629e85fd121782d4a6a28b114404766d180b8b411cb11
+  schema_bundle_sha256: 661dc1829eff8f0245ca35c39c562222945b0c8d4f8b570f5d38154c90f6c14d
+
+header_contract:
+  allowed_names:
+    - nexus-contract
+    - nexus-routing-key
+    - nexus-schema-sha256
+    - traceparent
+  routing_header_name: nexus-routing-key
+  contract_header_name: nexus-contract
+  contract_header_value: inventory.adjusted.v1
+  schema_header_name: nexus-schema-sha256
+  schema_header_value: 661dc1829eff8f0245ca35c39c562222945b0c8d4f8b570f5d38154c90f6c14d
+  optional_header_names:
+    - traceparent
+
+admission_contract:
+  maximum_unique_records: 64
+  nominal_value_bytes: 1024
+  maximum_value_bytes: 4096
+  maximum_key_bytes: 192
+  maximum_headers: 8
+  maximum_header_name_bytes: 64
+  maximum_header_value_bytes: 256
+  exclusion_precedence:
+    - tombstone
+    - empty
+    - oversized
+    - non_utf8
+    - whitespace_only
+    - newline_unsafe
+    - key_mismatch
+    - header_mismatch
+
+snapshot_contract:
+  offset_interval: half_open
+  completion_rule: contiguous_next_offset_equals_end_offset_exclusive
+  planning_cutoffs:
+    - name: early
+      planning_cutoff: "2026-06-20T00:00:00Z"
+    - name: final
+      planning_cutoff: "2026-06-30T00:00:00Z"
+
+expected_evidence_contract:
+  contract_version: r2d.a1.expected-evidence.v1
+  correction_projection: without_file_evidence
+  portable_recovery_projection: without_checkpoint_evidence
+  direct_provenance_projection: without_file_evidence
+  normalized_business_sha256: b108686db885928d368b193c693b870e3a5cd187ecc18806062991ca286c8962
+  capture_transcript_sha256: 2aa0422110a2afed32b932a8d93e48380a43616474d1db48484947c6e0f72716
+  correction_semantics_projection_sha256: 9f93334dd33e45858c3867a2a2b36369ccd7469c6cb1956f890a583dba63ce2c
+  portable_recovery_projection_sha256: 3640842ffb325845f3d981dd7f9c65f094216b9da1605b0a8118ceeba70bde09
+  direct_provenance_projection_sha256: b12380c6f2b9e6e1d7e015833bdaf4b9a667bfca47619e962bbe13b73b69d183
+
+resource_contract:
+  wall_time_seconds: 300
+  peak_process_tree_rss_mib: 4096
+  maximum_process_tree_threads: 256
+  artifact_mib: 1024
+  shutdown_seconds: 10
+  maximum_surviving_descendants: 0
+
+scope_contract:
+  implementation: portable_in_memory_capture
+  broker_dependency: none
+  database_dependency: none
+  operational_recovery_claim: false
+  exactly_once_claim: false

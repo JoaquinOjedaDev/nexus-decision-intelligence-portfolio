@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.local/contracts/r2-source-manifest.schema.json",
+  "title": "NEXUS R2A source manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "classification",
+    "generator",
+    "profile",
+    "seed",
+    "start_date",
+    "days",
+    "planning_cutoff",
+    "early_replay_cutoff",
+    "sources",
+    "expected_controls"
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"profile": {"const": "learning"}}},
+      "then": {"properties": {"generator": {"const": "nexus-r2-learning-supply-network"}}},
+      "else": {"properties": {"generator": {"const": "nexus-r2-supply-network"}}}
+    }
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "classification": {
+      "const": "synthetic"
+    },
+    "generator": {
+      "enum": ["nexus-r2-supply-network", "nexus-r2-learning-supply-network"]
+    },
+    "profile": {
+      "enum": ["smoke", "learning"]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "days": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "planning_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "early_replay_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "file_name",
+          "content_sha256",
+          "record_count"
+        ],
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+          },
+          "file_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "record_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "expected_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_inventory_adjustments",
+        "deferred_inventory_adjustments",
+        "fulfillment_rows",
+        "opening_inventory_rows",
+        "product_location_rows",
+        "purchase_order_rows",
+        "quarantine_rows",
+        "receipt_rows",
+        "supplier_rows",
+        "superseded_inventory_adjustments"
+      ],
+      "properties": {
+        "accepted_inventory_adjustments": { "type": "integer", "minimum": 0 },
+        "deferred_inventory_adjustments": { "type": "integer", "minimum": 0 },
+        "fulfillment_rows": { "type": "integer", "minimum": 0 },
+        "opening_inventory_rows": { "type": "integer", "minimum": 0 },
+        "product_location_rows": { "type": "integer", "minimum": 0 },
+        "purchase_order_rows": { "type": "integer", "minimum": 0 },
+        "quarantine_rows": { "type": "integer", "minimum": 0 },
+        "receipt_rows": { "type": "integer", "minimum": 0 },
+        "supplier_rows": { "type": "integer", "minimum": 0 },
+        "superseded_inventory_adjustments": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

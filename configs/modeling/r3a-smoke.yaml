@@ -1,0 +1,79 @@
+release: R3A
+contract_version: 1.0.0
+profile: r2a-synthetic-contract-smoke
+seed: 20260718
+
+data_contract:
+  source_dataset: gold.r2_demand_history
+  classification: synthetic
+  target: latent_demand_qty
+  stockout_policy: require_uncensored_demand
+  master_history: current_snapshot_only
+
+feature_contract:
+  version: r3a-pit-v1
+  lags_days: [1, 7, 14]
+  rolling_windows_days: [7, 14]
+  features:
+    - lag_demand
+    - rolling_mean
+    - rolling_nonzero_rate
+    - days_since_nonzero
+    - history_count
+    - target_day_of_week
+  fit_scope: each_origin_only
+
+forecast_contract:
+  grain: sku-location-day
+  issue_time_utc: "04:00:00"
+  horizon_days: 7
+  season_length_days: 7
+  quantiles: [0.025, 0.10, 0.50, 0.90, 0.975]
+  cold_start_fallback: zero
+  hierarchy: [sku_location, sku, network]
+
+evaluation:
+  rolling_origins:
+    - name: cold_start_probe
+      issue_time: "2026-06-08T04:00:00Z"
+      role: diagnostic
+    - name: calibration_probe
+      issue_time: "2026-06-15T04:00:00Z"
+      role: calibration
+    - name: frozen_stress
+      issue_time: "2026-06-22T04:00:00Z"
+      role: final_stress
+  primary_metric: weighted_interval_score
+  equal_observation_weights: true
+  bootstrap:
+    confidence_level: 0.95
+    resamples: 200
+    resampling_unit: sku_location_origin_block
+    seed: 20260718
+  contract_smoke_coverage_tolerance: 0.20
+  full_g3_coverage_tolerance: 0.05
+
+promotion:
+  automatic: false
+  current_champion: seasonal_naive_empirical_intervals
+  minimum_wis_improvement: 0.10
+  candidate_must_win: true
+  synthetic_performance_claims_allowed: false
+
+resource_budget:
+  wall_time_scope: r3a_modeling_materialization
+  wall_time_seconds: 180
+  peak_rss_scope: python_process_lifetime_high_water
+  peak_rss_mib: 1536
+  thread_scope: python_interpreter_threads_after_materialization
+  model_threads: 2
+  artifact_scope: governed_scientific_artifacts
+  promotable_artifacts_mib: 50
+
+deferred_full_g3:
+  - licensed_representative_demand_benchmark
+  - horizons_14_and_28
+  - global_lightgbm_quantile_candidate
+  - probabilistic_supplier_lead_time_model
+  - calibrated_hierarchy_reconciliation
+  - mlflow_registered_candidate

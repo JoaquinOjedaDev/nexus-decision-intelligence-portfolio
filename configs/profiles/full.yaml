@@ -1,0 +1,29 @@
+name: full
+contract_version: 1.0.0
+classification: synthetic
+seed: 20260718
+start_date: 2021-01-01
+sku_count: 3049
+location_count: 10
+series_count: 30490
+supplier_count: 100
+history_days: 1941
+partition_granularity: month
+write_batch_rows: 100000
+order_cycle_days: 14
+forecast_horizons_days: [7, 14, 28]
+holdout_days: 84
+cold_start_history_days: 56
+stress_days: 28
+cohort_counts:
+  smooth: 10672
+  intermittent: 7623
+  erratic: 6098
+  lumpy: 3049
+  cold_start: 3048
+resource_budget:
+  maximum_runtime_seconds: 7200
+  peak_rss_mib: 16384
+  maximum_artifact_mib: 32768
+  maximum_python_threads: 16
+requires_explicit_opt_in: true

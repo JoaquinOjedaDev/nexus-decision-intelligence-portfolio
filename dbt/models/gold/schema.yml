@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: fct_inventory_position
+    description: Current inventory position reconciled from immutable adjustment events.
+    columns:
+      - name: sku_location_key
+        data_tests: [unique, not_null]
+      - name: sku_id
+        data_tests: [not_null]
+      - name: location_id
+        data_tests: [not_null]
+      - name: on_hand_qty
+        data_tests: [not_null]
+      - name: contributing_event_count
+        data_tests: [not_null]
+      - name: as_of_event_time
+        data_tests: [not_null]

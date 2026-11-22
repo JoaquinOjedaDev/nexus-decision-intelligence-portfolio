@@ -1,0 +1,36 @@
+release: R2D-B1
+contract_version: 1.0.0
+
+data_contract:
+  r2d_a1_config_path: configs/ingestion/r2d-a1.yaml
+  r2d_a1_config_sha256: 310f33d61df4188ba58644723b7021784c5b12dc76e6e00adf6c4457cad8fc2a
+
+schema_policy:
+  event_type: inventory.adjusted
+  supported_contract_versions:
+    - "1.0"
+  supported_event_versions:
+    - 1
+  envelope_schema_path: contracts/schemas/event-envelope.schema.json
+  payload_schema_path: contracts/schemas/r2-inventory-adjustment-payload.schema.json
+  schema_bundle_sha256: 661dc1829eff8f0245ca35c39c562222945b0c8d4f8b570f5d38154c90f6c14d
+  compatibility_algorithm: conservative_object_backward_v1
+  incompatible_action: dead_letter
+  business_validation_owner: R2A
+
+dead_letter_policy:
+  evidence_dataset: r2d.b1.dead_letter
+  redrive_dataset: r2d.b1.redrive
+  preserve_original_bytes: true
+  redrive_mode: manual_append_only
+  require_operator_identity: true
+  require_reason: true
+  auto_redrive_identity_conflicts: false
+  maximum_reason_characters: 500
+
+scope:
+  portable_contract_status: PASS
+  service_dead_letter_topic_status: NOT_RUN
+  persistent_dagster_status: NOT_RUN
+  operational_alert_delivery_status: NOT_RUN
+  full_g2_status: OPEN

@@ -1,0 +1,29 @@
+name: smoke
+contract_version: 1.0.0
+classification: synthetic
+seed: 20260718
+start_date: 2026-01-01
+sku_count: 20
+location_count: 2
+series_count: 40
+supplier_count: 5
+history_days: 84
+partition_granularity: month
+write_batch_rows: 512
+order_cycle_days: 14
+forecast_horizons_days: [7, 14, 28]
+holdout_days: 28
+cold_start_history_days: 35
+stress_days: 14
+cohort_counts:
+  smooth: 14
+  intermittent: 10
+  erratic: 8
+  lumpy: 4
+  cold_start: 4
+resource_budget:
+  maximum_runtime_seconds: 120
+  peak_rss_mib: 1536
+  maximum_artifact_mib: 100
+  maximum_python_threads: 4
+requires_explicit_opt_in: false

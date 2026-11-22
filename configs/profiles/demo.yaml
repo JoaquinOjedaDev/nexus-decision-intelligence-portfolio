@@ -1,0 +1,29 @@
+name: demo
+contract_version: 1.0.0
+classification: synthetic
+seed: 20260718
+start_date: 2024-01-01
+sku_count: 100
+location_count: 5
+series_count: 500
+supplier_count: 10
+history_days: 730
+partition_granularity: month
+write_batch_rows: 10000
+order_cycle_days: 14
+forecast_horizons_days: [7, 14, 28]
+holdout_days: 56
+cold_start_history_days: 56
+stress_days: 28
+cohort_counts:
+  smooth: 175
+  intermittent: 125
+  erratic: 100
+  lumpy: 50
+  cold_start: 50
+resource_budget:
+  maximum_runtime_seconds: 900
+  peak_rss_mib: 3072
+  maximum_artifact_mib: 1024
+  maximum_python_threads: 4
+requires_explicit_opt_in: false

@@ -1,0 +1,48 @@
+release: R2D-B2c
+contract_version: 1.0.0
+
+inherited:
+  b2a_config_path: configs/ingestion/r2d-b2a.yaml
+  b2a_config_sha256: 48df248406fe9d7efad755418cd43f8410763984833ecdb7ceee98c584bfd9e5
+  b2b_config_path: configs/orchestration/r2d-b2b.yaml
+  b2b_config_sha256: 70b2114d22617b1950c7a3519c033634f1c3fcf289c4308c3369fe4fdcbbc48d
+
+services:
+  compose_file: infra/compose.yaml
+  redpanda_service: redpanda
+  postgres_service: postgres
+  redpanda_volume_destination: /var/lib/redpanda/data
+  postgres_volume_destination: /var/lib/postgresql/data
+  stop_timeout_seconds: 30
+  start_wait_timeout_seconds: 120
+  require_same_container_ids: true
+  require_same_named_volumes: true
+  require_healthy_before_and_after: true
+
+broker:
+  retained_topics:
+    - inventory.adjusted.v1
+    - inventory.adjusted.dlq.v1
+    - inventory.adjusted.redrive.v1
+  partition_count: 2
+  reconnect_probe_topic: nexus.r2d.b2c.reconnect.v1
+  reconnect_probe_partition_count: 1
+  reconnect_probe_replication_factor: 1
+  reconnect_probe_consumer_group_id: nexus-r2d-b2c-reconnect-v1
+  poll_timeout_seconds: 30
+
+postgres:
+  expected_backfill_status: COMPLETED
+  expected_run_status: SUCCESS
+  expected_run_count: 2
+  require_exact_table_counts: true
+
+scope:
+  inherited_b2a_status: PASS
+  inherited_b2b_status: PASS
+  retained_multiservice_restart_status: PASS
+  operational_alert_delivery_status: NOT_RUN
+  high_availability_status: NOT_RUN
+  backup_restore_status: NOT_RUN
+  full_r2d_b_status: IN_PROGRESS
+  full_g2_status: OPEN

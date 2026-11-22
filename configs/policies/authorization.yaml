@@ -1,0 +1,11 @@
+version: 1.0.0
+roles:
+  planner: [recommendation:read, recommendation:propose, scenario:run, approval:request]
+  approver: [recommendation:read, approval:approve, approval:reject]
+  auditor: [recommendation:read, approval:read, execution:read, audit:read]
+maker_checker:
+  enabled: true
+  proposer_cannot_approve: true
+approval_binding:
+  fields: [recommendation_fingerprint, policy_version, quantities, cost_envelope]
+  expiry_minutes: 1440

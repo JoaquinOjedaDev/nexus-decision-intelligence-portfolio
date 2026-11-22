@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.local/contracts/r2-inventory-adjustment-payload.schema.json",
+  "title": "NEXUS R2A revisioned inventory adjustment payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "logical_event_id",
+    "revision",
+    "sku_id",
+    "location_id",
+    "delta_qty",
+    "reason_code"
+  ],
+  "properties": {
+    "logical_event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sku_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "location_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "delta_qty": {
+      "type": "integer",
+      "not": {
+        "const": 0
+      }
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    }
+  }
+}

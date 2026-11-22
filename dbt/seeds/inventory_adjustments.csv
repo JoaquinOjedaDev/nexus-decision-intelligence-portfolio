@@ -1,0 +1,6 @@
+event_id,sku_id,location_id,delta_qty,reason,event_time,ingested_at
+evt-0001,sku-001,loc-01,100,opening_balance,2026-01-01T09:00:00Z,2026-01-01T09:00:03Z
+evt-0002,sku-001,loc-01,-4,sale,2026-01-01T10:00:00Z,2026-01-01T10:00:02Z
+evt-0003,sku-001,loc-01,12,receipt,2026-01-01T11:00:00Z,2026-01-01T11:00:04Z
+evt-0004,sku-002,loc-01,40,opening_balance,2026-01-01T09:00:00Z,2026-01-01T09:00:03Z
+evt-0005,sku-002,loc-01,-3,sale,2026-01-01T10:30:00Z,2026-01-01T10:30:02Z

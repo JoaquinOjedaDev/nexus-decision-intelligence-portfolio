@@ -1,0 +1,51 @@
+{
+  "contract_version": "1.0",
+  "manifest_id": "22222222-2222-4222-8222-222222222222",
+  "decision_type": "weekly_replenishment",
+  "decision_key": "ARG-2026-W29",
+  "decision_time": "2026-07-18T12:00:00Z",
+  "valid_until": "2026-07-19T12:00:00Z",
+  "created_at": "2026-07-18T12:00:05Z",
+  "created_by": "planner.alba",
+  "input_snapshots": [
+    {
+      "dataset": "gold.inventory_position",
+      "snapshot_id": "inventory-2026w29-r1",
+      "schema_version": "1.0.0",
+      "as_of": "2026-07-18T11:55:00Z",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "row_count": 12500,
+      "partition_keys": [
+        "week"
+      ]
+    }
+  ],
+  "forecast_artifact": {
+    "name": "seasonal-naive",
+    "version": "1.0.0",
+    "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "optimizer_artifact": {
+    "name": "base-stock-policy",
+    "version": "1.0.0",
+    "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "policy_artifact": {
+    "name": "replenishment-guardrails",
+    "version": "1.0.0",
+    "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "scenario_seed": 290718,
+  "recommendations": [
+    {
+      "sku_id": "SKU-001",
+      "location_id": "DC-ARG-01",
+      "recommended_quantity": 120,
+      "horizon_days": 7,
+      "reason_code": "below_base_stock"
+    }
+  ],
+  "correlation_id": "replan-2026w29",
+  "trace_id": "trace-manifest-0001",
+  "fingerprint": "c11ecdb9d459ce112e8b627d7537b2700a227d847e3696cbc98ff1fa433c33ca"
+}

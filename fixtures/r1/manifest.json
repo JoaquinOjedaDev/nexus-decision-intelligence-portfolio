@@ -1,0 +1,31 @@
+{
+  "classification": "synthetic",
+  "fixture_version": "1.0.0",
+  "license": "Project-generated synthetic data; repository license applies.",
+  "planning_cutoff": "2026-07-15T09:00:00Z",
+  "temporal_contract": "Batch rows use available_at; events use occurred_at and ingested_at.",
+  "sources": [
+    {
+      "file": "product_location_master.csv",
+      "role": "batch master data"
+    },
+    {
+      "file": "demand_history.csv",
+      "role": "batch daily demand"
+    },
+    {
+      "file": "inventory_snapshot.csv",
+      "role": "batch inventory snapshot"
+    },
+    {
+      "file": "inventory_events.jsonl",
+      "role": "at-least-once operational events"
+    }
+  ],
+  "expected_controls": {
+    "accepted_inventory_events": 1,
+    "duplicate_events": 1,
+    "gold_demand_rows": 14,
+    "malformed_events": 1
+  }
+}

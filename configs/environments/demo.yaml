@@ -1,0 +1,5 @@
+name: demo
+data: rebuilt_from_source_manifest_and_seed
+identity_issuer: replaceable_oidc_contract
+external_llm_required: false
+promoted_artifacts_only: true

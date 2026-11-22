@@ -1,0 +1,23 @@
+name: nexus
+version: 1.0.0
+config-version: 2
+profile: nexus
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  nexus:
+    staging:
+      +materialized: view
+    gold:
+      +materialized: table
+
+seeds:
+  nexus:
+    +quote_columns: false

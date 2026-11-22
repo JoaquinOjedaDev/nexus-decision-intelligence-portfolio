@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv-cache/
+.pytest_cache/
+.pytest-tmp-*/
+.hypothesis/
+.pytest-r2d-*/
+.r2d-*/
+.mypy_cache/
+.ruff_cache/
+.playwright-cli/
+output/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated data and artifacts
+data/**
+!data/.gitkeep
+artifacts/**
+!artifacts/.gitkeep
+logs/
+
+# dbt / DuckDB
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+dbt_packages/
+*.duckdb
+*.duckdb.wal
+
+# Docker and IDE
+.docker/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Node (reserved for the control tower)
+node_modules/
+dist/
+.next/
