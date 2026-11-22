@@ -1,5 +1,8 @@
 # Security policy
 
+The GitHub Pages workspace displays a read-only snapshot of synthetic planning
+and execution evidence. The operational API is separate.
+
 NEXUS is a local synthetic portfolio demonstration. Its persona login and mock
 order workflow must not be deployed on a public interface. See
 [deployment boundaries](docs/portfolio/SECURITY.md) before running a service.
