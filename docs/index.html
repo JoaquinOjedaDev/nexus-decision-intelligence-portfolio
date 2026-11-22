@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Explore the forecast, replenishment plan, and approval evidence from a recorded NEXUS planning run.">
-  <meta name="theme-color" content="#152a2a">
-  <title>NEXUS | Replenishment planning</title>
+  <meta name="description" content="Review a 14-day replenishment plan, demand forecast, scenario costs, and recorded approval evidence.">
+  <meta name="theme-color" content="#122b28">
+  <title>NEXUS | Replenishment plan</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./workspace.css">
   <script src="./workspace-snapshot.js" defer></script>
@@ -14,84 +14,103 @@
 <body>
   <a class="skip-link" href="#main">Skip to analysis</a>
   <header class="masthead">
-    <div class="frame">
+    <div class="frame masthead-inner">
       <a class="wordmark" href="./index.html">NEXUS</a>
       <nav aria-label="Project navigation">
-        <a href="#recommendation">Recommendation</a>
+        <a href="#recommendation">Orders</a>
         <a href="#scenarios">Scenarios</a>
         <a href="#workflow">Approval trail</a>
-        <a href="https://github.com/JoaquinOjedaDev/nexus-decision-intelligence-portfolio">Source code</a>
+        <a class="source-link" href="https://github.com/JoaquinOjedaDev/nexus-decision-intelligence-portfolio">Source code</a>
       </nav>
     </div>
   </header>
 
   <main id="main" class="frame">
-    <section class="intro">
-      <h1>Replenishment planning</h1>
-      <p>Explore the forecast, constraints, and approval evidence behind a recorded 14-day supply plan using synthetic data.</p>
-      <dl class="summary">
-        <div><dt>Planning cutoff</dt><dd id="cutoff">…</dd></div>
-        <div><dt>Planned purchases</dt><dd id="budget">…</dd></div>
-        <div><dt>Solver result</dt><dd id="solver">…</dd></div>
-      </dl>
+    <section class="plan" aria-labelledby="plan-title">
+      <div>
+        <h1 id="plan-title">Replenishment plan</h1>
+        <p class="plan-description" id="plan-description">A recorded 14-day supply plan using synthetic data.</p>
+        <dl class="plan-facts">
+          <div><dt>Planning cutoff</dt><dd id="cutoff">…</dd></div>
+          <div><dt>Solver result</dt><dd id="solver">…</dd></div>
+        </dl>
+      </div>
+      <div class="budget-panel">
+        <h2>Purchase budget</h2>
+        <p class="budget-value"><strong id="purchase-total">…</strong> <span id="budget-total"></span></p>
+        <div class="budget-track" aria-hidden="true"><span id="budget-fill"></span></div>
+        <p class="budget-caption"><span id="budget-usage"></span><span id="budget-left"></span></p>
+      </div>
     </section>
 
     <noscript><p>Enable JavaScript to explore the recorded planning evidence.</p></noscript>
 
-    <section id="recommendation" class="panel" aria-labelledby="recommendation-title">
-      <div class="section-head">
-        <div>
-          <h2 id="recommendation-title">Recommendation</h2>
-          <p>Choose a product and location to inspect the forecast and proposed order.</p>
-        </div>
-        <label class="picker">Product and location
-          <select id="item"></select>
-        </label>
-      </div>
-      <dl class="order-facts" aria-live="polite">
-        <div><dt>Order quantity</dt><dd id="quantity">…</dd></div>
-        <div><dt>Starting inventory</dt><dd id="inventory">…</dd></div>
-        <div><dt>Purchase estimate</dt><dd id="purchase">…</dd></div>
-        <div><dt>Supplier and lead time</dt><dd id="supplier">…</dd></div>
-      </dl>
-      <div class="forecast">
+    <div class="analysis-grid">
+      <section id="recommendation" class="panel" aria-labelledby="recommendation-title">
         <div class="section-head">
-          <h3>Daily demand forecast</h3>
-          <p class="legend"><span>10th–90th percentile range</span><span>Median</span></p>
+          <h2 id="recommendation-title">Recommended order</h2>
+          <label class="picker" for="item">Product and location
+            <select id="item"></select>
+          </label>
         </div>
-        <div class="chart" id="chart" aria-hidden="true"></div>
-        <div class="chart-dates" id="chart-dates" aria-hidden="true"></div>
-        <details>
-          <summary>Forecast values by day</summary>
-          <table>
-            <thead><tr><th scope="col">Date</th><th scope="col">P10</th><th scope="col">Median</th><th scope="col">P90</th></tr></thead>
-            <tbody id="forecast-values"></tbody>
-          </table>
-        </details>
+        <dl class="order-facts" aria-live="polite">
+          <div class="order-quantity"><dt>Order quantity</dt><dd id="quantity">…</dd></div>
+          <div><dt>On hand</dt><dd id="inventory">…</dd></div>
+          <div><dt>Purchase estimate</dt><dd id="purchase">…</dd></div>
+          <div><dt>Supplier and lead time</dt><dd id="supplier">…</dd></div>
+        </dl>
+        <div class="forecast">
+          <div class="section-head">
+            <h3>Daily demand forecast</h3>
+            <p class="legend"><span>P10 to P90</span> <span>Median</span></p>
+          </div>
+          <p class="chart-unit" aria-hidden="true">Units per day</p>
+          <div class="forecast-grid" aria-hidden="true">
+            <div class="chart-axis" id="chart-axis"></div>
+            <div>
+              <div class="chart" id="chart"></div>
+              <div class="chart-dates" id="chart-dates"></div>
+            </div>
+          </div>
+          <details>
+            <summary>Daily forecast values</summary>
+            <table>
+              <thead><tr><th scope="col">Date</th><th scope="col">P10</th><th scope="col">Median</th><th scope="col">P90</th></tr></thead>
+              <tbody id="forecast-values"></tbody>
+            </table>
+          </details>
+        </div>
+      </section>
+
+      <section id="scenarios" class="panel" aria-labelledby="scenarios-title">
+        <h2 id="scenarios-title">Scenario trade-offs</h2>
+        <p class="scenario-insight" id="scenario-insight"></p>
+        <p class="chart-unit">Mean operating cost</p>
+        <ul class="scenarios" id="scenario-values" aria-label="Scenario operating costs and fill rates"></ul>
+        <p class="section-note" id="scenario-scope"></p>
+      </section>
+    </div>
+
+    <section id="workflow" class="panel workflow" aria-labelledby="workflow-title">
+      <div>
+        <h2 id="workflow-title">Approval trail</h2>
+        <p class="section-note" id="audit-summary" role="status"></p>
+        <button class="return-button" id="show-audit" type="button" hidden>View recorded order</button>
       </div>
-    </section>
-
-    <section id="scenarios" class="panel" aria-labelledby="scenarios-title">
-      <h2 id="scenarios-title">Scenario trade-offs</h2>
-      <p>The same order quantities were evaluated across six synthetic paths per scenario. Operating costs include expediting and can exceed the purchase budget.</p>
-      <div class="scenario-grid" id="scenario-values"></div>
-    </section>
-
-    <section id="workflow" class="panel" aria-labelledby="workflow-title">
-      <h2 id="workflow-title">Approval trail</h2>
-      <p id="audit-summary"></p>
-      <ol class="events" id="audit-events"></ol>
-      <dl class="order-facts">
-        <div><dt>Mock order reference</dt><dd id="execution">…</dd></div>
-        <div><dt>Received units</dt><dd id="received">…</dd></div>
-        <div><dt>Simulated demand</dt><dd id="observed">…</dd></div>
-      </dl>
+      <div id="audit-details">
+        <ol class="events" id="audit-events"></ol>
+        <dl class="audit-facts">
+          <div><dt>Mock order reference</dt><dd id="execution">…</dd></div>
+          <div><dt>Received</dt><dd id="received">…</dd></div>
+          <div><dt>Simulated demand</dt><dd id="observed">…</dd></div>
+        </dl>
+      </div>
     </section>
 
     <footer class="evidence">
-      <h2>Validation</h2>
+      <h2>Run validation</h2>
       <p id="validation"></p>
-      <p>Read-only snapshot from a connected verification run. Orders, demand, and outcomes are synthetic.</p>
+      <p>Read-only record. Orders, demand, and outcomes are synthetic.</p>
     </footer>
   </main>
 </body>
